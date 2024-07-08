@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "sensor-temp_ph_sal": "c"
+    }
+}
