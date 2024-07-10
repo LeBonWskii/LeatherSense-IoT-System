@@ -1,7 +1,6 @@
 import mysql.connector
 from coapthon.server.coap import CoAP
 from resources.registration import Registration
-from resources.control import Control
 import json
 from models.database import Database
 
@@ -25,8 +24,7 @@ class CoAPServer(CoAP):
         self.db = Database()
         self.connection = self.db.connect()
         self.initialize_resources()
-        self.add_resource("register/", Registration("Registration"))
-        self.add_resource("control/", Control("Control"))
+        self.add_resource("registration/", Registration("Registration"))
 
     def initialize_resources(self):
         '''
@@ -40,13 +38,13 @@ class CoAPServer(CoAP):
         # Initialize resources list
         try:
             cursor = self.connection.cursor()
-            initialize_resources_query = "TRUNCATE TABLE sensor"
+            initialize_resources_query = "TRUNCATE TABLE actuator"
             cursor.execute(initialize_resources_query)
             self.connection.commit()
             cursor.close()
         # Handle database errors
         except Error as e:
-            print(f"Error truncating sensor table: {e}")
+            print(f"Error truncating actuator table: {e}")
     
     def close(self):
         '''

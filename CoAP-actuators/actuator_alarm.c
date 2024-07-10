@@ -28,7 +28,7 @@
 
 // Variables
 static coap_endpoint_t server_ep;
-static coap_message_t request[1];
+static coap_message_t request[1];		// This way the packet can be treated as pointer as usual
 static char *service_registration_url = "/registration";
 static int max_registration_retry = MAX_REGISTRATION_RETRY;
 
@@ -90,13 +90,18 @@ PROCESS_THREAD(actuator_alarm, ev, data){
 	// Registration is tried until is successful
 	while(max_registration_retry!=0){
 		
-		// Prepare registration request
+		// Populate the coap_endpoint_t data structure
 		coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
+
+		// Prepare the message
 		coap_init_message(request, COAP_TYPE_CON,COAP_POST, 0);
 		coap_set_header_uri_path(request, service_registration_url);
+
+		// Set the payload
 		coap_set_payload(request, (uint8_t *)NODE_NAME_JSON, sizeof(NODE_NAME_JSON) - 1);
 	
 		// Send registration request
+		// The actuator will wait the reply or the transmission timeout
 		COAP_BLOCKING_REQUEST(&server_ep, request, client_chunk_handler);
     
 		// Registration failed

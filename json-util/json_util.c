@@ -6,6 +6,14 @@
 #include <unistd.h>
 #include <stdint.h>
 
+/*
+* Find a string field in a JSON
+*
+* @param jsonString JSON string
+* @param fieldName Field name
+* @return Field value
+* @note The returned value must be freed by the caller
+*/
 char* findJsonField_String(const char* jsonString, const char* fieldName) {
     const char* start = jsonString;
     char* value = NULL;
@@ -46,6 +54,14 @@ char* findJsonField_String(const char* jsonString, const char* fieldName) {
     return value;
 }
 
+/*
+* Find a number field in a JSON
+*
+* @param jsonString JSON string
+* @param fieldName Field name
+* @return Field value
+* @note If the field is not found, -1 is returned
+*/
 int findJsonField_Number(const char* jsonString, const char* fieldName) {
     const char* start = jsonString;
     int number = 0;
@@ -71,7 +87,7 @@ int findJsonField_Number(const char* jsonString, const char* fieldName) {
                         char* endPtr;
                         number = strtol(start, &endPtr, 10);
                         if (endPtr == start) {
-                            number = 0;  // Conversion failed
+                            number = -1;  // Conversion failed
                         }
                     }
                 }

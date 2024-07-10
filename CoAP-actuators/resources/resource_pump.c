@@ -94,7 +94,7 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
 
 // Resource definition
 RESOURCE(res_pump,
-         "title=\"LEATHERSENSE: ?actuator_pump=0..\" POST/PUTaction=<action>\";rt=\"Control\";if=\"actuator\"",
+         "title=\"LEATHERSENSE: ?actuator_pump=<string>\" POST/PUTaction=<action>\";rt=\"Control\";if=\"actuator\"",
          NULL,
          NULL,
          res_put_handler,

@@ -1,10 +1,14 @@
-from coapServer import CoAPServer
+from CoAPServer import CoAPServer
+from resources.config import host, port
 
 def main():
-    host = "::"
-    port = 5683
+    '''
+    Main function
+    :return: None
+    '''
+    
     server = CoAPServer(host, port)
-
+    
     try:
         print("CoAP server start")
         server.listen(10)

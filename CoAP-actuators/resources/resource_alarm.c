@@ -52,7 +52,7 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
 
 // Resource definition
 RESOURCE(res_alarm,
-         "title=\"LEATHERSENSE: ?actuator_alarm=0..\" POST/PUTaction=<action>\";rt=\"Control\";if=\"actuator\"",
+         "title=\"LEATHERSENSE: ?actuator_alarm=<string>\" POST/PUTaction=<action>\";rt=\"Control\";if=\"actuator\"",
          NULL,
          NULL,
          res_put_handler,
