@@ -47,7 +47,7 @@ class Database:
         else:
             try:
                 # import credentials.key file to get MySQL credentials
-                with open("private/credentials.json", "r") as file:
+                with open("../private/credential.json", "r") as file:
                     self.credentials = json.load(file)
 
                 self.connection = mysql.connector.connect(host= self.credentials["MYSQL_HOST"],

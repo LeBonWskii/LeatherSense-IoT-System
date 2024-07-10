@@ -1,6 +1,6 @@
 from coapthon.server.coap import CoAP
 from resources.Registration import Registration
-from models.database import Database
+from database.models.database import Database
 
 class CoAPServer(CoAP):
 

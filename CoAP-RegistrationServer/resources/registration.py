@@ -6,7 +6,7 @@ from coapthon.messages.request import Request
 from coapthon import defines
 import json
 from mysql.connector import Error
-from models.database import Database
+from database.models.database import Database
 from SystemActuatorData import SystemActuatorData as SAD
     
 ''' This module contains the Registration class which is a CoAP resource that handles GET requests for actuator registration. '''
