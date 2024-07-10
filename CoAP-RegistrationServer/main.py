@@ -1,5 +1,5 @@
 from CoAPServer import CoAPServer
-from resources.config import host, port
+from resources.CoAPConfig import CoAPConfig
 
 def main():
     '''
@@ -7,7 +7,7 @@ def main():
     :return: None
     '''
     
-    server = CoAPServer(host, port)
+    server = CoAPServer(CoAPConfig.host, CoAPConfig.port)
     
     try:
         print("CoAP server start")

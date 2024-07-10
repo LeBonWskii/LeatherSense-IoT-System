@@ -1,7 +1,5 @@
-import mysql.connector
 from coapthon.server.coap import CoAP
-from resources.registration import Registration
-import json
+from resources.Registration import Registration
 from models.database import Database
 
 class CoAPServer(CoAP):
@@ -31,10 +29,13 @@ class CoAPServer(CoAP):
         Initialize resources list in the database
         :return: None
         '''
+        print("Initializing resources")
+
         # Check if database connection is still active
         if not self.connection.is_connected():
             print("Database connection lost")
             return
+        
         # Initialize resources list
         try:
             cursor = self.connection.cursor()
@@ -42,6 +43,7 @@ class CoAPServer(CoAP):
             cursor.execute(initialize_resources_query)
             self.connection.commit()
             cursor.close()
+        
         # Handle database errors
         except Error as e:
             print(f"Error truncating actuator table: {e}")
@@ -51,6 +53,7 @@ class CoAPServer(CoAP):
         Close the CoAP server
         :return: None
         '''
+        
         # Close CoAP server
         super(CoAPServer, self).close()
         print("CoAP server closed")

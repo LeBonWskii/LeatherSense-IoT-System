@@ -7,7 +7,7 @@ from coapthon import defines
 import json
 from mysql.connector import Error
 from models.database import Database
-from actuator_data import actuators
+from SystemActuatorData import SystemActuatorData as SAD
     
 ''' This module contains the Registration class which is a CoAP resource that handles GET requests for actuator registration. '''
 
@@ -41,7 +41,7 @@ class Registration(Resource):
         # Initialize the database
         self.database = Database()
         self.connection = self.database.connect_db()
-        self.actuators = actuators
+        self.actuators = SAD.actuators
     
     def render_POST(self, request):
         '''
