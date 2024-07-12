@@ -7,15 +7,11 @@ from CoapClient import CoapClient
 from models import PHSensor, SalinitySensor, SO2Sensor, TempSensor
 
 class PollingDB:
-    def __init__(self):
+
+    def __init__(self, types):
         self.db = Database()
         asyncio.initiate_id()
-        self.types = {
-            "so2": SO2Sensor(),
-            "temp": TempSensor(),
-            "ph": PHSensor(),
-            "salinity": SalinitySensor()
-        }
+        self.types = types
 
     async def start(self):
         '''

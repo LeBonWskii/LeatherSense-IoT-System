@@ -3,8 +3,14 @@ from components.CLI import CLI
 from components.PollingDB import PollingDB
 
 async def main():
-    cli_task = asyncio.create_task(CLI().start())
-    polling_db_task = asyncio.create_task(PollingDB().start())
+    types = {
+        "so2": SO2Sensor(),
+        "temp": TempSensor(),
+        "ph": PHSensor(),
+        "salinity": SalinitySensor()
+    }
+    cli_task = asyncio.create_task(CLI(types).start())
+    polling_db_task = asyncio.create_task(PollingDB(types).start())
     
     await asyncio.gather(cli_task, polling_db_task)
 
