@@ -6,6 +6,7 @@ class TempSensor(Sensor):
     
     def __init__(self):
         super().__init__()
+        self._type = "temperature"
         self._min = DefaultParameters.intervals["temperature"]["min"]
         self._max = DefaultParameters.intervals["temperature"]["max"]
         self._delta = DefaultParameters.intervals["temperature"]["delta"]

@@ -1,14 +1,19 @@
 import os
+import sys
 import time
 import paho.mqtt.client as mqtt
 import json
 import threading
 from queue import Queue, Empty
+import asyncio
 
 class CLI:
 
     def __init__(self, sensor_map):
         self.sensor_map = sensor_map
+        self.publish_queue = Queue() # queue that allows publisher thread to communicate with main thread and publish data
+        self.stop_event = threading.Event()
+        self.publisher_thread = threading.Thread(target=self.mqtt_publisher_thread, args=("127.0.0.1", 1883, self.stop_event, self.publish_queue))
 
     async def start(self):
 
@@ -25,12 +30,9 @@ class CLI:
                                                                                                                                                                                     
         ''')
 
-        CommandList()
+        self.CommandList()
 
-        publish_queue = Queue() # queue that allows publisher thread to communicate with main thread and publish data
-        stop_event = threading.Event()
-        publisher_thread = threading.Thread(target=mqtt_publisher_thread, args=("127.0.0.1", 1883, stop_event, publish_queue))
-        publisher_thread.start()
+        self.publisher_thread.start()
 
         try:
             while 1:
@@ -39,8 +41,8 @@ class CLI:
         
         except KeyboardInterrupt:
             print("SHUTDOWN")
-            stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
-            publisher_thread.join()  # Attendi che il thread MQTT termini.
+            self.stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
+            self.publisher_thread.join()  # Attendi che il thread MQTT termini.
             os._exit(0)
     
     async def handleCommand(self, command):
@@ -54,12 +56,14 @@ class CLI:
             await self.help()
         elif command == "exit":
             print("Exiting...")
-            stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
-            publisher_thread.join()  # Attendi che il thread MQTT termini.        
-            break
+            self.stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
+            self.publisher_thread.join()  # Attendi che il thread MQTT termini.
+            sys._exit(0)        
+            
         else:
             print("Invalid command. Type 'help' for available commands.")
-    
+
+    @staticmethod
     def CommandList():
         print("\n|----- AVAILABLE COMMANDS -----|")
         print("| 1. configure                 |")
@@ -69,10 +73,11 @@ class CLI:
         print("| 5. exit                      |")
         print("|------------------------------|\n")
     
-    def configure():
-        listOfsensors()
-        getsensorvalues()
+    async def configure(self):
+        self.listOfsensors()
+        await self.getsensorvalues()
 
+    @staticmethod
     def listOfsensors():
         print("\n|----- AVAILABLE SENSORS -----|\n")
         print("| 1. temperature              |\n")
@@ -81,74 +86,83 @@ class CLI:
         print("| 4. exit                     |\n")
         print("|-----------------------------|\n")
         
-    def getsensorvalues():
+    async def getsensorvalues(self):
         while 1:
             sensor=await asyncio.get_event_loop().run_in_executor(None, input("SENSOR> "))
             sensor = sensor.lower()
+            if sensor == "temperature":
+                sensor = "temp"
             
-            if sensor in sensor_map.keys():
-                listOfparameters(sensor)
-                getparameters(sensor)
+            if sensor in self.sensor_map.keys():
+                self.listOfparameters(sensor)
+                await self.getparameters(sensor)
                 break
             elif sensor == "exit":
-                CommandList()
+                self.CommandList()
                 break
             else:
                 print("Invalid sensor. Please enter a valid sensor or exit.\n")
-                listOfsensors()
-
+                self.listOfsensors()
+                
+    @staticmethod
     def listOfparameters(sensor):
-        if sensor == "temperature":
+        if sensor == "temp":
             print("\n|----- AVAILABLE PARAMETERS -----|\n")
             print("| 1. max                         |\n")
-            print("| 2. exit                        |\n")
+            print("| 2. delta                       |\n")
+            print("| 3. both                        |\n")
+            print("| 4. exit                        |\n")
             print("|--------------------------------|\n")
-        elif sensor == "pH":
+        elif sensor == "ph":
             print("\n|----- AVAILABLE PARAMETERS -----|\n")
             print("| 1. max                         |\n")
             print("| 2. min                         |\n")
             print("| 3. both                        |\n")
-            print("| 4. exit                        |\n")
+            print("| 4. delta                       |\n")
+            print("| 5. all                         |\n")
+            print("| 6. exit                        |\n")
             print("|--------------------------------|\n")
         elif sensor == "salinity":
             print("\n|----- AVAILABLE PARAMETERS -----|\n")
             print("| 1. max                         |\n")
             print("| 2. min                         |\n")
             print("| 3. both                        |\n")
-            print("| 4. exit                        |\n")
+            print("| 4. delta                       |\n")
+            print("| 5. all                         |\n")
+            print("| 6. exit                        |\n")
             print("|--------------------------------|\n")
     
-    def getparameters(sensor):
+    async def getparameters(self,sensor):
         while 1:
             parameter=await asyncio.get_event_loop().run_in_executor(None, input("PARAMETER> "))
             parameter = parameter.lower()
-            if sensor == "temperature" and parameter in ["min", "both"]:
-                print("Temperature sensor has only one parameter: max. Please enter a valid parameter.\n")
+            if sensor == "temp" and parameter in ["min", "both", "all"]:
+                print("Temperature sensor has only two parameters: max and delta. Please enter a valid parameter.\n")
                 continue
-            elif parameter in ["max", "min", "both"]:
-                parametershandler(sensor, parameter)
+            elif parameter in ["max", "min", "both", "delta", "all"]:
+                self.parametershandler(sensor, parameter)
                 break
             elif parameter == "exit":
-                CommandList()
+                self.CommandList()
                 break
             else:
                 print("Invalid parameter. Please enter a valid parameter or exit.\n")
-                listOfparameters(sensor)
+                self.listOfparameters(sensor)
 
-    def parametershandler(sensor, parameter):
-        sensor = sensor_map.get(sensor)
+    async def parametershandler(self,sensor, parameter):
+        sensor = self.sensor_map.get(sensor)
         while 1:
             if parameter == "max":
                 try:
-                    maxvalue = float(input("MAX VALUE>: "))
-                    maxvalue = round(maxvalue, 2)
+                    maxvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MAX VALUE> ")
+                    maxvalue = round(float(maxvalue), 2)
                     
-                    if not sensor.validate_value(max_value=maxvalue):
-                        print(f"Invalid input. The maximum value {maxvalue} must be greater than the actual minimum value {sensor.get_min_value()}.")
+                    if sensor.min>maxvalue:
+                        print(f"Invalid input. The maximum value {maxvalue} must be greater than the actual minimum value {sensor.min}.")
                         continue
 
-                    sensor.set_parameters(max_value=maxvalue)
-                    publish_queue.put((f"params/{sensor.sensor_type}", {"max_value":maxvalue}))
+                    sensor.max = maxvalue
+                    self.publish_queue.put((f"params/{sensor.type}", {"max_value":maxvalue}))
                     break
 
                 except ValueError:
@@ -156,14 +170,14 @@ class CLI:
 
             elif parameter == "min":
                 try:
-                    minvalue = float(input("MIN VALUE>: "))
-                    minvalue = round(minvalue, 2)
-                    if not sensor.validate_value(min_value=minvalue):
-                        print(f"Invalid input. The minimum value {minvalue} must be less than the actual maximum value {sensor.get_max_value()}.")
+                    minvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MIN VALUE> ")
+                    minvalue = round(float(minvalue), 2)
+                    if sensor.max<minvalue:
+                        print(f"Invalid input. The minimum value {minvalue} must be less than the actual maximum value {sensor.max}.")
                         continue
 
-                    sensor.set_parameters(min_value=minvalue)
-                    publish_queue.put((f"params/{sensor.sensor_type}", {"min_value":minvalue}))
+                    sensor.min = minvalue
+                    self.publish_queue.put((f"params/{sensor.type}", {"min_value":minvalue}))
                     break
 
                 except ValueError:
@@ -171,22 +185,83 @@ class CLI:
 
             elif parameter == "both":
                 try:
-                    maxvalue = float(input("MAX VALUE>: "))
-                    maxvalue = round(maxvalue, 2)
-                    minvalue = float(input("MIN VALUE>: "))
-                    minvalue = round(minvalue, 2)   
+                    maxvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MAX VALUE>: ")
+                    maxvalue = round(float(maxvalue), 2)
 
-                    if minvalue > maxvalue:
-                        print(f"Invalid input. The minimum value {minvalue} must be less than the maximum value {maxvalue}.")
+                    if sensor.type == "temperature":
+                        delta = await asyncio.get_event_loop().run_in_executor(None, input, "DELTA> ")
+                        delta = round(float(delta), 2)
+                    else:    
+                        minvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MIN VALUE>: ")
+                        minvalue = round(float(minvalue), 2)
+
+                    if(sensor.type== "temperature" and delta>maxvalue):
+                        print(f"Invalid input. The delta value {delta} must be less or equal than the maximum value for temperature sensor {maxvalue}.")
                         continue
 
-                    sensor.set_parameters(max_value=maxvalue, min_value=minvalue)
-                    publish_queue.put((f"params/{sensor.sensor_type}", {"max_value":maxvalue, "min_value":minvalue}))
+                    if minvalue > maxvalue:
+                        print(f"Invalid input. The minimum value {minvalue} must be less or equal than the maximum value {maxvalue}.")
+                        continue
+
+                    sensor.max = maxvalue
+                    if(sensor.type == "temperature"):
+                        sensor.delta = delta
+                        self.publish_queue.put((f"params/{sensor.type}", {"max_value":maxvalue, "delta":delta}))
+                    else:
+                        sensor.min = minvalue
+                        self.publish_queue.put((f"params/{sensor.type}", {"max_value":maxvalue, "min_value":minvalue}))
                     break
 
                 except ValueError:
                     print("Invalid input. Please enter valid numbers.")
 
+            elif parameter == "delta":
+                try:
+                    delta = await asyncio.get_event_loop().run_in_executor(None, input, "DELTA> ")
+                    delta = round(float(delta), 2)
+
+                    if(sensor.type== "temperature" and delta>sensor.max):
+                        print(f"Invalid input. The delta value {delta} must be less or equal than the actual maximum value for temperature sensor {sensor.max}.")
+                        continue
+                    elif(delta<(sensor.max-sensor.min)/2 or delta>sensor.max-sensor.min):
+                        print(f"Invalid input. The delta value {delta} must be between {(sensor.max-sensor.min)/2} and {delta>sensor.max-sensor.min}.")
+                        continue
+
+                    sensor.delta = delta
+                    self.publish_queue.put((f"params/{sensor.type}", {"delta":delta}))
+
+                    break
+
+                except ValueError:
+                    print("Invalid input. Please enter a valid number.")
+                    
+            elif parameter == "all":
+                try:
+                    maxvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MAX VALUE>: ")
+                    maxvalue = round(float(maxvalue), 2)
+                    minvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MIN VALUE>: ")
+                    minvalue = round(float(minvalue), 2)
+                    delta = await asyncio.get_event_loop().run_in_executor(None, input, "DELTA>: ")
+                    delta = round(float(delta), 2)
+
+                    if minvalue > maxvalue:
+                        print(f"Invalid input. The minimum value {minvalue} must be less than the maximum value {maxvalue}.")
+                        continue
+
+                    elif(delta<(maxvalue-minvalue)/2 or delta>maxvalue-minvalue):
+                        print(f"Invalid input. The delta value {delta} must be between {(maxvalue-minvalue)/2} and {delta>maxvalue-minvalue}.")
+                        continue
+
+                    sensor.max = maxvalue
+                    sensor.min = minvalue
+                    sensor.delta = delta
+                    self.publish_queue.put((f"params/{sensor.type}", {"max_value":maxvalue, "min_value":minvalue, "delta":delta}))
+                    break
+
+                except ValueError:
+                    print("Invalid input. Please enter valid numbers.")
+
+    @staticmethod
     def help():
         print("\n|----- COMMAND EXPLANATION -----|")
         print("| 1. configure - Configure ranges for actuator activation.")
@@ -198,6 +273,7 @@ class CLI:
 
 
     # Configurazione del client MQTT
+    @staticmethod
     def mqtt_publisher_thread(broker_address, broker_port, stop_event, publish_queue):
         client = mqtt.Client()
         client.connect(broker_address, broker_port, 60)

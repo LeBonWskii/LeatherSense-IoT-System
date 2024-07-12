@@ -6,6 +6,7 @@ class SalinitySensor(Sensor):
 
     def __init__(self):
         super().__init__()
+        self._type = "salinity"
         self._min = DefaultParameters.intervals["salinity"]["min"]
         self._max = DefaultParameters.intervals["salinity"]["max"]
         self._delta = DefaultParameters.intervals["salinity"]["delta"]

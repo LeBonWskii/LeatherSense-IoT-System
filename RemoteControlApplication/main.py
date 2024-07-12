@@ -1,6 +1,7 @@
 import asyncio
 from components.CLI import CLI
 from components.PollingDB import PollingDB
+from components.models import PHSensor, SalinitySensor, SO2Sensor, TempSensor
 
 async def main():
     types = {

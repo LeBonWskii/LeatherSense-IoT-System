@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
 
 class Sensor(ABC):
-    def __init__(self, min_value=None, max_value=None, delta=None, value=0):
+    def __init__(self, type=None,min_value=None, max_value=None, delta=None, value=0):
+        self._type = type
         self._min = min_value
         self._max = max_value
         self._delta = delta
         self._value = value
-
+    
+    @property
+    def type(self):
+        return self._type
+    
     @property
     def min(self):
         return self._min
