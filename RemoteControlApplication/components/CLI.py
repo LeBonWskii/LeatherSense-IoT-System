@@ -7,6 +7,9 @@ import threading
 from queue import Queue, Empty
 import asyncio
 
+class ShutDownRequest(Exception):
+    pass
+
 class CLI:
 
     def __init__(self, sensor_map):
@@ -36,7 +39,7 @@ class CLI:
 
         try:
             while 1:
-                command = await asyncio.get_event_loop().run_in_executor(None, input("COMMAND> "))
+                command = await asyncio.get_event_loop().run_in_executor(None, input, "COMMAND> ")
                 await self.handleCommand(command.lower())
         
         except KeyboardInterrupt:
@@ -53,12 +56,12 @@ class CLI:
         elif command == "monitor":
             await self.monitor()
         elif command == "help":
-            await self.help()
+            self.help()
         elif command == "exit":
             print("Exiting...")
             self.stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
             self.publisher_thread.join()  # Attendi che il thread MQTT termini.
-            sys._exit(0)        
+            raise ShutDownRequest()       
             
         else:
             print("Invalid command. Type 'help' for available commands.")
@@ -88,7 +91,7 @@ class CLI:
         
     async def getsensorvalues(self):
         while 1:
-            sensor=await asyncio.get_event_loop().run_in_executor(None, input("SENSOR> "))
+            sensor=await asyncio.get_event_loop().run_in_executor(None, input, "SENSOR> ")
             sensor = sensor.lower()
             if sensor == "temperature":
                 sensor = "temp"
@@ -134,13 +137,13 @@ class CLI:
     
     async def getparameters(self,sensor):
         while 1:
-            parameter=await asyncio.get_event_loop().run_in_executor(None, input("PARAMETER> "))
+            parameter=await asyncio.get_event_loop().run_in_executor(None, input, "PARAMETER> ")
             parameter = parameter.lower()
             if sensor == "temp" and parameter in ["min", "both", "all"]:
                 print("Temperature sensor has only two parameters: max and delta. Please enter a valid parameter.\n")
                 continue
             elif parameter in ["max", "min", "both", "delta", "all"]:
-                self.parametershandler(sensor, parameter)
+                await self.parametershandler(sensor, parameter)
                 break
             elif parameter == "exit":
                 self.CommandList()
@@ -224,7 +227,7 @@ class CLI:
                         print(f"Invalid input. The delta value {delta} must be less or equal than the actual maximum value for temperature sensor {sensor.max}.")
                         continue
                     elif(delta<(sensor.max-sensor.min)/2 or delta>sensor.max-sensor.min):
-                        print(f"Invalid input. The delta value {delta} must be between {(sensor.max-sensor.min)/2} and {delta>sensor.max-sensor.min}.")
+                        print(f"Invalid input. The delta value {delta} must be between {(sensor.max-sensor.min)/2} and {sensor.max-sensor.min}.")
                         continue
 
                     sensor.delta = delta
@@ -249,7 +252,7 @@ class CLI:
                         continue
 
                     elif(delta<(maxvalue-minvalue)/2 or delta>maxvalue-minvalue):
-                        print(f"Invalid input. The delta value {delta} must be between {(maxvalue-minvalue)/2} and {delta>maxvalue-minvalue}.")
+                        print(f"Invalid input. The delta value {delta} must be between {(maxvalue-minvalue)/2} and {maxvalue-minvalue}.")
                         continue
 
                     sensor.max = maxvalue
@@ -263,7 +266,7 @@ class CLI:
 
     @staticmethod
     def help():
-        print("\n|-------------------- COMMAND EXPLANATION --------------------|")
+        print("\n|--------------------- COMMAND EXPLANATION ---------------------|")
         print("| 1. configure - Configure ranges for actuator activation.      |")
         print("| 2. status    - Check the actuator status.                     |")
         print("| 3. monitor   - Monitor the sensor values.                     |")

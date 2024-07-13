@@ -1,5 +1,7 @@
-from database.models.database import Database
+import sys
 from mysql.connector import Error
+sys.path.append("..")
+from database.models.database import Database
 
 class ResourceDAO:
     '''
@@ -13,7 +15,7 @@ class ResourceDAO:
 
     prefix = "actuator_"
     _db = Database()
-    _connection = db.connect_db()
+    _connection = _db.connect()
 
     def __init__(self, ip, resource, status=None):
         self.ip = ip

@@ -1,5 +1,5 @@
-from models.Sensor import Sensor
-from config.DefaultParameters import DefaultParameters
+from .Sensor import Sensor
+from .config.DefaultParameters import DefaultParameters
 
 class TempSensor(Sensor):
     _instance = None

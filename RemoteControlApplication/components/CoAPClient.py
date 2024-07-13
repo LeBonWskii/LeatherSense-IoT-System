@@ -1,7 +1,9 @@
 import json
 import asyncio
 import aiohttp
-from models.database import ResourceDAO
+import sys
+sys.path.append("../..")
+from DAO.ResourceDAO import ResourceDAO
 
 class CoAPClient:
 
