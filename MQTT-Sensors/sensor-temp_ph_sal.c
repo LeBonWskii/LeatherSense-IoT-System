@@ -42,9 +42,11 @@
 #include "os/sys/log.h"
 #include "mqtt-client.h"
 #include "os/dev/button-hal.h"
+#include "../cJSON-master/cJSON.h"
 
 #include <string.h>
 #include <strings.h>
+#include <stdbool.h>
 /*---------------------------------------------------------------------------*/
 #define LOG_MODULE "sensor-temp_ph_sal"
 #ifdef MQTT_CLIENT_CONF_LOG_LEVEL
@@ -62,6 +64,8 @@ static const char *broker_ip = MQTT_CLIENT_BROKER_IP_ADDR;
 // Default config values
 #define DEFAULT_BROKER_PORT         1883
 #define DEFAULT_PUBLISH_INTERVAL    (30 * CLOCK_SECOND)
+#define RECONNECT_DELAY_MS (CLOCK_SECOND * 5) 
+
 
 // We assume that the broker does not require authentication
 
@@ -126,99 +130,396 @@ static bool temp_out_of_bounds = false;
 static bool ph_out_of_bounds = false;
 static bool salinity_out_of_bounds = false;
 
-/*variables for sensing treshold*/
-static int max_temp_treshold = 30;
-static int min_temp_treshold = 10;
-static int max_ph_treshold = 8;
-static int min_ph_treshold = 6;
-static int max_salinity_treshold = 35;
-static int min_salinity_treshold = 30;
+/*variables for sensing threshold*/
+static double max_temp_threshold = 25;
+static double min_ph_threshold = 2.8;
+static double max_ph_threshold = 3;
+static double min_salinity_threshold = 2;
+static double max_salinity_threshold = 3;
+static double delta_temp = 5;
+static double delta_ph = 0.1;
+static double delta_salinity = 0.5;
+
+static double temp_error_tolerance = 1.25;//delta_temp/4
+static double ph_error_tolerance =0.025; //delta_ph/4
+static double salinity_error_tolerance =0.125; //delta_salinity/4
 
 /*variables for sensing values*/
-static int current_temp = 0;
-static int current_ph = 0;
-static int current_salinity = 0;
+static double current_temp = 0;
+static double current_ph = 0;
+static double current_salinity = 0;
 
 /* Array of topics to subscribe to */
-static const char* topics[] = {"param/temp", "param/ph", "param/sal"}; 
+static const char* topics[] = {"params/temperature", "params/ph", "params/salinity"}; 
 #define NUM_TOPICS 3
 static int current_topic_index = 0; // Index of the current topic being subscribed to
+static int count_sensor_interval = 0;//counter to check the number of times the sensor is activated
+static bool warning_status_active = false; //flag to check if the warning is active
+
+static char payload[BUFFER_SIZE];
+
 
 static struct ctimer tps_sensor_timer; //timer for periodic sensing values of temperature, pH and salinity
 static bool first_time = true; //flag to check if it is the first time the sensor is activated
+static struct etimer reconnection_timer; //timer for reconnection to the broker
 
-#define SENSOR_INTERVAL (CLOCK_SECOND * 20) //interval for sensing values of temperature, pH and salinity
+#define SENSOR_INTERVAL (CLOCK_SECOND * 10) //interval for sensing values of temperature, pH and salinity
+#define MONITORING_INTERVAL (CLOCK_SECOND * 5) //interval for monitoring the values of temperature, pH and salinity if they are out of bounds
+
 /*---------------------------------------------------------------------------*/
 /*Utility functions for generate random sensing values*/
 
-static int generate_random_temp(){
-    return (rand() % (max_temp_treshold - min_temp_treshold + 1)) + min_temp_treshold;
-} 
+static double generate_random_temp() {
+    
+    double random_fraction = (double)rand() / RAND_MAX;
 
-static int generate_random_ph(){
-    return (rand() % (max_ph_treshold - min_ph_treshold + 1)) + min_ph_treshold;
+    
+    if ((rand() % 100) < 80) 
+      return 5 + random_fraction * (max_temp_threshold - 5);
+    else 
+      return (max_temp_threshold + 1) + random_fraction * (delta_temp + 1);
+    
 }
 
-static int generate_random_salinity(){
-    return (rand() % (max_salinity_treshold - min_salinity_treshold + 1)) + min_salinity_treshold;
+
+static double generate_random_ph() {
+    
+    double random_fraction = (double)rand() / RAND_MAX;
+
+    return min_ph_threshold + random_fraction * (max_ph_threshold - min_ph_threshold);
+}
+
+
+static double generate_random_salinity() {
+    
+    double random_fraction = (double)rand() / RAND_MAX;
+
+    return min_salinity_threshold + random_fraction * (max_salinity_threshold - min_salinity_threshold);
+}
+
+void replace_comma_with_dot(char *str) {
+    char *ptr = str;
+    while (*ptr != '\0') {
+        if (*ptr == ',') {
+            *ptr = '.';
+        }
+        ptr++;
+    }
 }
 
 /*---------------------------------------------------------------------------*/
 static void sensor_callback(void *ptr){
     if(state != STATE_SUBSCRIBEDALL) // Check if the sensor is subscribed to all topics
         return;
-    leds_on(LEDS_NUM_TO_MASK(LEDS_GREEN)); //turn on green led to signal the sensing
 
     // Generate random values for temperature, pH and salinity
     current_temp = generate_random_temp();
     current_ph = generate_random_ph();
     current_salinity = generate_random_salinity();
 
-    LOG_INFO("Sensing finished: temperature: %d, pH: %d, salinity: %d\n", current_temp, current_ph, current_salinity);
+    LOG_INFO("Sensing finished: temperature: %f, pH: %f, salinity: %f\n", current_temp, current_ph, current_salinity);
 
-    // Check if the values are within the limits
-    if(current_temp < min_temp_treshold || current_temp > max_temp_treshold)
-        temp_out_of_bounds = true;
-    else
-        temp_out_of_bounds = false;
+    if(!warning_status_active){
+      if(current_temp > max_temp_threshold)
+          temp_out_of_bounds = true;
+      else
+          temp_out_of_bounds = false;
+      if(current_ph < min_ph_threshold || current_ph > max_ph_threshold)
+          ph_out_of_bounds = true;
+      else
+          ph_out_of_bounds = false;
+      if(current_salinity < min_salinity_threshold || current_salinity > max_salinity_threshold)
+          salinity_out_of_bounds = true;
+      else
+          salinity_out_of_bounds = false;
+    }
+    
 
-    if(current_ph < min_ph_treshold || current_ph > max_ph_treshold)
-        ph_out_of_bounds = true;
-    else
-        ph_out_of_bounds = false;
 
-    if(current_salinity < min_salinity_treshold || current_salinity > max_salinity_treshold)
-        salinity_out_of_bounds = true;
-    else
-        salinity_out_of_bounds = false;
 
-    // Publish the values
-    sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); //publish on the topic sensor/temp_pH_sal
-    sprintf(app_buffer, "{ \"temperature\": %d, \"pH\": %d, \"salinity\": %d }", current_temp, current_ph, current_salinity);
-    mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
-    LOG_INFO("Publishing values on %s topic\n", pub_topic);
-    leds_off(LEDS_NUM_TO_MASK(LEDS_GREEN)); //turn off green led to signal the end of the sensing
-    // Set the timer for the next sensing
-    ctimer_reset(&tps_sensor_timer);
+    if(warning_status_active){
 
+      if(temp_out_of_bounds && current_temp <= max_temp_threshold - delta_temp - temp_error_tolerance)
+          temp_out_of_bounds = false;
+      if(ph_out_of_bounds && (current_ph >= max_ph_threshold - delta_ph - ph_error_tolerance && current_ph <= min_ph_threshold + delta_ph + ph_error_tolerance))
+          ph_out_of_bounds = false;
+      if(salinity_out_of_bounds && (current_salinity >= max_salinity_threshold - delta_salinity - salinity_error_tolerance && current_salinity <= min_salinity_threshold + delta_salinity + salinity_error_tolerance))
+          salinity_out_of_bounds = false;
+
+
+      /*if all values are in the range [min_value + delta ; max_value - delta] then publish data and set warning status off*/
+      if (!temp_out_of_bounds && !ph_out_of_bounds && !salinity_out_of_bounds) {
+          sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
+
+          cJSON *root = cJSON_CreateObject();
+          if (!root) {
+              printf("Error creating cJSON object.\n");
+              return;  
+          }
+
+          // Convert numeric values to strings
+          char temp_str[20]; // Adjust size based on your maximum expected length
+          char ph_str[20];
+          char salinity_str[20];
+          sprintf(temp_str, "%.2f", current_temp);
+          sprintf(ph_str, "%.2f", current_ph);
+          sprintf(salinity_str, "%.2f", current_salinity);
+
+          // Add temperature, pH, and salinity values as strings to cJSON object
+          cJSON_AddStringToObject(root, "temperature", temp_str);
+          cJSON_AddStringToObject(root, "pH", ph_str);
+          cJSON_AddStringToObject(root, "salinity", salinity_str);
+
+          char *json_string = cJSON_PrintUnformatted(root); 
+          if (!json_string) {
+              cJSON_Delete(root);
+              printf("Error converting cJSON object to JSON string.\n");
+              return;  
+          }
+
+          sprintf(app_buffer, "%s", json_string);
+
+          // Cleanup cJSON resources
+          cJSON_Delete(root);
+          free(json_string);
+
+          // Publish JSON string
+          mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
+          LOG_INFO("Publishing values on %s topic. Publishing reason: warning status disabled\n", pub_topic);
+
+          // Reset variables and set timer
+          warning_status_active = false;
+          count_sensor_interval = 0;
+          ctimer_set(&tps_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
+      }
+
+        /*else if values are not in range publish only after 3 times (15 seconds in warning status)*/
+        else if(count_sensor_interval == 3){
+              sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
+
+              cJSON *root = cJSON_CreateObject();
+              if (!root) {
+                  printf("Error creating cJSON object.\n");
+                  return;  
+              }
+
+              // Convert numeric values to strings
+              char temp_str[20]; // Adjust size based on your maximum expected length
+              char ph_str[20];
+              char salinity_str[20];
+              sprintf(temp_str, "%.2f", current_temp);
+              sprintf(ph_str, "%.2f", current_ph);
+              sprintf(salinity_str, "%.2f", current_salinity);
+
+              // Add temperature, pH, and salinity values as strings to cJSON object
+              cJSON_AddStringToObject(root, "temperature", temp_str);
+              cJSON_AddStringToObject(root, "pH", ph_str);
+              cJSON_AddStringToObject(root, "salinity", salinity_str);
+
+              char *json_string = cJSON_PrintUnformatted(root); 
+              if (!json_string) {
+                  cJSON_Delete(root);
+                  printf("Error converting cJSON object to JSON string.\n");
+                  return;  
+              }
+
+              sprintf(app_buffer, "%s", json_string);
+
+              // Cleanup cJSON resources
+              cJSON_Delete(root);
+              free(json_string);
+
+              // Publish JSON string
+              mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
+              LOG_INFO("Publishing values on %s topic. Publishing reason: warning status disabled\n", pub_topic);
+              count_sensor_interval = 0;
+              ctimer_reset(&tps_sensor_timer);
+        }
+        else{
+            count_sensor_interval++;
+            ctimer_reset(&tps_sensor_timer);
+        }   
+    }
+    else{
+      /*if are detected values out of bounds for the first time then publish data and set warning status on*/
+        if(temp_out_of_bounds || ph_out_of_bounds || salinity_out_of_bounds){
+              sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
+
+              cJSON *root = cJSON_CreateObject();
+              if (!root) {
+                  printf("Error creating cJSON object.\n");
+                  return;  
+              }
+
+              // Convert numeric values to strings
+              char temp_str[20]; // Adjust size based on your maximum expected length
+              char ph_str[20];
+              char salinity_str[20];
+              sprintf(temp_str, "%.2f", current_temp);
+              sprintf(ph_str, "%.2f", current_ph);
+              sprintf(salinity_str, "%.2f", current_salinity);
+
+              // Add temperature, pH, and salinity values as strings to cJSON object
+              cJSON_AddStringToObject(root, "temperature", temp_str);
+              cJSON_AddStringToObject(root, "pH", ph_str);
+              cJSON_AddStringToObject(root, "salinity", salinity_str);
+
+              char *json_string = cJSON_PrintUnformatted(root); 
+              if (!json_string) {
+                  cJSON_Delete(root);
+                  printf("Error converting cJSON object to JSON string.\n");
+                  return;  
+              }
+
+              sprintf(app_buffer, "%s", json_string);
+
+              // Cleanup cJSON resources
+              cJSON_Delete(root);
+              free(json_string);
+
+              // Publish JSON string
+              mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
+              LOG_INFO("Publishing values on %s topic. Publishing reason: warning status disabled\n", pub_topic);
+              warning_status_active = true;
+              count_sensor_interval = 0;
+              ctimer_set(&tps_sensor_timer, MONITORING_INTERVAL, sensor_callback, NULL);
+        }
+        else{
+          /*else all is ok publish only after 3 times (30 seconds in normal status)*/
+            if(count_sensor_interval == 3){
+                sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
+
+                cJSON *root = cJSON_CreateObject();
+                if (!root) {
+                    printf("Error creating cJSON object.\n");
+                    return;  
+                }
+
+                // Convert numeric values to strings
+                char temp_str[20]; // Adjust size based on your maximum expected length
+                char ph_str[20];
+                char salinity_str[20];
+                sprintf(temp_str, "%.2f", current_temp);
+                sprintf(ph_str, "%.2f", current_ph);
+                sprintf(salinity_str, "%.2f", current_salinity);
+
+                // Add temperature, pH, and salinity values as strings to cJSON object
+                cJSON_AddStringToObject(root, "temperature", temp_str);
+                cJSON_AddStringToObject(root, "pH", ph_str);
+                cJSON_AddStringToObject(root, "salinity", salinity_str);
+
+                char *json_string = cJSON_PrintUnformatted(root); 
+                if (!json_string) {
+                    cJSON_Delete(root);
+                    printf("Error converting cJSON object to JSON string.\n");
+                    return;  
+                }
+
+                sprintf(app_buffer, "%s", json_string);
+
+                // Cleanup cJSON resources
+                cJSON_Delete(root);
+                free(json_string);
+
+                // Publish JSON string
+                mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
+                LOG_INFO("Publishing values on %s topic. Publishing reason: warning status disabled\n", pub_topic);
+                count_sensor_interval = 0;
+                ctimer_reset(&tps_sensor_timer);
+            }
+            else{
+                count_sensor_interval++;
+                ctimer_reset(&tps_sensor_timer);
+            }
+        }
+    }
 }
+
 /*---------------------------------------------------------------------------*/
 PROCESS(sensor_temp_ph_sal, "MQTT sensor_temperature_pH_sal");
 AUTOSTART_PROCESSES(&sensor_temp_ph_sal);
 
 /*---------------------------------------------------------------------------*/
 /*Handler to manage the setting of parameters in case of publication on the topic to which the sensor is subscribed*/
-static void
-pub_handler_temp(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
-    // Handle temperature settings
+static void pub_handler_temp(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
+    memcpy(payload, chunk, chunk_len);
+    payload[chunk_len] = '\0';
+    cJSON *json = cJSON_Parse(payload);
+    cJSON *max = cJSON_GetObjectItem(json, "max_value");
+    cJSON *delta = cJSON_GetObjectItem(json, "delta");
+    
+    if(max){
+        LOG_INFO("Temperature maximum value threshold set from %f to %f\n", max_temp_threshold, max->valuedouble);
+        max_temp_threshold = max->valuedouble;
+    }
+
+    if(delta){
+        LOG_INFO("Temperature delta value set from %f to %f\n", delta_temp, delta->valuedouble);
+        delta_temp = delta->valuedouble;
+    }
+
+    if(delta_temp < (max_temp_threshold/2 + max_ph_threshold /4) )
+      temp_error_tolerance = delta_temp/4;
+    else
+      temp_error_tolerance = 0;
+
 }
-static void
-pub_handler_ph(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
-    // Handle pH settings
+static void pub_handler_ph(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
+    memcpy(payload, chunk, chunk_len);
+    payload[chunk_len] = '\0';
+    cJSON *json = cJSON_Parse(payload);
+    cJSON *min = cJSON_GetObjectItem(json, "min_value");
+    cJSON *max = cJSON_GetObjectItem(json, "max_value");
+    cJSON *delta = cJSON_GetObjectItem(json, "delta");
+
+    if(min){
+        LOG_INFO("pH minimum value threshold set from %f to %f\n", min_ph_threshold, min->valuedouble);
+        min_ph_threshold = min->valuedouble;
+    }
+
+    if(max){
+        LOG_INFO("pH maximum value threshold set from %f to %f\n", max_ph_threshold, max->valuedouble);
+        max_ph_threshold = max->valuedouble;
+    }
+
+    if(delta){
+        LOG_INFO("pH delta value set from %f to %f\n", delta_ph, delta->valuedouble);
+        delta_ph = delta->valuedouble;
+    }
+
+    if(delta_ph < ((max_temp_threshold - min_ph_threshold)/2 + (max_ph_threshold - min_ph_threshold)/4) )
+      ph_error_tolerance = delta_ph/4;
+    else
+      ph_error_tolerance = 0;
+    
 }
-static void
-pub_handler_sal(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
-    // Handle salinity settings
+static void pub_handler_sal(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
+    memcpy(payload, chunk, chunk_len);
+    payload[chunk_len] = '\0';
+    cJSON *json = cJSON_Parse(payload);
+    cJSON *min = cJSON_GetObjectItem(json, "min_value");
+    cJSON *max = cJSON_GetObjectItem(json, "max_value");
+    cJSON *delta = cJSON_GetObjectItem(json, "delta");
+
+    if(min){
+        LOG_INFO("Salinity minimum value threshold set from %f to %f\n", min_salinity_threshold, min->valuedouble);
+        min_salinity_threshold = min->valuedouble;
+    }
+
+    if(max){
+        LOG_INFO("Salinity maximum value threshold set from %f to %f\n", max_salinity_threshold, max->valuedouble);
+        max_salinity_threshold = max->valuedouble;
+    }
+
+    if(delta){
+        LOG_INFO("Salinity delta value set from %f to %f\n", delta_salinity, delta->valuedouble);
+        delta_salinity = delta->valuedouble;
+    }
+
+    if(delta_salinity < ((max_salinity_threshold - min_salinity_threshold)/2 + (max_salinity_threshold - min_salinity_threshold)/4) )
+      salinity_error_tolerance = delta_salinity/4;
+    else
+      salinity_error_tolerance = 0;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -238,11 +539,11 @@ static void mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data
   case MQTT_EVENT_PUBLISH: {
     msg_ptr = data;
 
-    if(strcmp(msg_ptr->topic, "param/temp") == 0)
+    if(strcmp(msg_ptr->topic, "params/temperature") == 0)
         pub_handler_temp(msg_ptr->topic, strlen(msg_ptr->topic), msg_ptr->payload_chunk, msg_ptr->payload_length);
-    else if(strcmp(msg_ptr->topic, "param/ph") == 0)
+    else if(strcmp(msg_ptr->topic,"params/ph") == 0)
         pub_handler_ph(msg_ptr->topic, strlen(msg_ptr->topic), msg_ptr->payload_chunk, msg_ptr->payload_length);
-    else if(strcmp(msg_ptr->topic, "param/sal") == 0)
+    else if(strcmp(msg_ptr->topic, "params/salinity") == 0)
         pub_handler_sal(msg_ptr->topic, strlen(msg_ptr->topic), msg_ptr->payload_chunk, msg_ptr->payload_length);
     break;
   }
@@ -311,7 +612,7 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
   while (1) {
     PROCESS_YIELD();
 
-    if ((ev == PROCESS_EVENT_TIMER && data == &periodic_timer) || ev == PROCESS_EVENT_POLL) {
+    if ((ev == PROCESS_EVENT_TIMER && data == &periodic_timer) || ev == PROCESS_EVENT_POLL || (ev == PROCESS_EVENT_TIMER && data == &reconnection_timer)) {
       if (state == STATE_INIT) {
         if (have_connectivity() == true)  
           state = STATE_NET_OK;
@@ -377,7 +678,10 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
         }
       } else if (state == STATE_DISCONNECTED) {
         LOG_ERR("Disconnected from MQTT broker\n");
-        // Recover from error
+        state = STATE_INIT;
+        etimer_set(&reconnection_timer, RECONNECT_DELAY_MS);
+        continue;
+
       }
       
       etimer_set(&periodic_timer, STATE_MACHINE_PERIODIC);
