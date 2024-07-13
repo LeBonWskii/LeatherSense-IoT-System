@@ -1,7 +1,7 @@
 #include "contiki.h"
 #include "coap-engine.h"
 #include "os/dev/leds.h"
-#include "json_util.h"
+#include "../cJSON-master/cJSON.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -111,8 +111,10 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
 	
     // Check if the payload is not empty and retrieve the action
     if(len>0){
-        action = findJsonField_String((char *)chunk, "action");
-        LOG_INFO("received command: action=%s\n", action);
+        cJSON *root = cJSON_ParseWithLength((const char *)chunk, len);
+        LOG_INFO("received payload: %s\n", cJSON_Print(root));
+        action = cJSON_GetObjectItem(root, "action")->valuestring;
+        LOG_INFO("Detected command: action=%s\n", action);
 	}
 
     // Check the action and set the pump status accordingly

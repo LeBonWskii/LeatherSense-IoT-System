@@ -13,6 +13,7 @@
 /*               Log configuration                */
 /* ---------------------------------------------- */
 
+#include "sys/log.h"
 #define LOG_MODULE "Actuator pump"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
@@ -41,8 +42,8 @@ void client_chunk_handler(coap_message_t *response){
 	}
 	
 	// Error
-	else if(response->code != 65){
-		LOG_ERR("Error: %d\n",response->code);	
+	else if(response->code != 65 && response->code != 68){
+		LOG_ERR("Error: %d\n",response->code);
 	}
 	
 	// Success
@@ -71,7 +72,7 @@ static struct etimer sleep_timer;
 
 // Process declaration
 PROCESS(actuator_pump, "Actuator pump");
-AUTOSTART_PROCESSES(actuator_pump);
+AUTOSTART_PROCESSES(&actuator_pump);
 
 /*
 * This process is used to register the actuator to the server
