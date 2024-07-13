@@ -1,4 +1,4 @@
-from config.DefaultParameters import DefaultParameters
+from .config.DefaultParameters import DefaultParameters
 
 class SO2Sensor():
     _instance = None

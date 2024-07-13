@@ -1,17 +1,19 @@
+import sys
 import asyncio
 import mysql.connector
 from datetime import datetime
-from database.models.database import Database
 from DAO.ResourceDAO import ResourceDAO
-from CoAPClient import CoAPClient
-from models import PHSensor, SalinitySensor, SO2Sensor, TempSensor
+from .CoAPClient import CoAPClient
+from .models import PHSensor, SalinitySensor, SO2Sensor, TempSensor
+sys.path.append("..")
+from database.models.database import Database
 
 class PollingDB:
 
     def __init__(self, types):
         self.db = Database()
         self.connection = self.db.connect()
-        asyncio.initiate_id()
+        self.initiate_id()
         self.types = types
 
     async def start(self):
@@ -22,7 +24,7 @@ class PollingDB:
             await self.polling()
             await asyncio.sleep(1)
     
-    async def initiate_id(self):
+    def initiate_id(self):
         '''
         Initiate the last id of the telemetry table
         '''
@@ -35,7 +37,12 @@ class PollingDB:
             cursor.execute(query)
             result = cursor.fetchall()
             cursor.close()
-            self.last_id = result[0][0]
+
+            # If there are no data, set the last id to 0
+            if result[0][0] is None:
+                self.last_id = 0
+            else:
+                self.last_id = result[0][0]
         except mysql.connector.Error as e:
             print(f"Error: {e}")
 
@@ -57,7 +64,7 @@ class PollingDB:
                 query = '''
                     SELECT value, id
                     FROM telemetry
-                    WHERE id > %s AND sensor_type = %s
+                    WHERE id > %s AND type = %s
                     ORDER BY id DESC
                     LIMIT 1;
                 '''
@@ -65,7 +72,6 @@ class PollingDB:
                 result = cursor.fetchall()
                 if result:
                     self.types[sensor_type].value = result[0][0]
-                    print(f"[PoolingDB]\t{sensor_type}: {result[0][0]}")
                     if new_id < result[0][1]:
                         new_id = result[0][1]
             cursor.close()
