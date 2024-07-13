@@ -13,6 +13,7 @@
 /*               Log configuration                */
 /* ---------------------------------------------- */
 
+#include "sys/log.h"
 #define LOG_MODULE "Actuator fans"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
@@ -41,7 +42,7 @@ void client_chunk_handler(coap_message_t *response){
 	}
 	
 	// Error
-	else if(response->code != 65){
+	else if(response->code != 65 && response->code != 68){
 		LOG_ERR("Error: %d\n",response->code);	
 	}
 	
@@ -71,7 +72,7 @@ static struct etimer sleep_timer;
 
 // Process declaration
 PROCESS(actuator_fans, "Actuator fans");
-AUTOSTART_PROCESSES(actuator_fans);
+AUTOSTART_PROCESSES(&actuator_fans);
 
 /*
 * This process is used to register the actuator to the server

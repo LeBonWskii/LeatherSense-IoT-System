@@ -1,3 +1,2 @@
 - CLI
-- implement cjon
 - impostare avvio e terminazione processo di piclaggio (CLI)

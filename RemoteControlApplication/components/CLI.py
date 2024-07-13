@@ -263,13 +263,13 @@ class CLI:
 
     @staticmethod
     def help():
-        print("\n|----- COMMAND EXPLANATION -----|")
-        print("| 1. configure - Configure ranges for actuator activation.")
-        print("| 2. status    - Check the actuator status.")
-        print("| 3. monitor   - Monitor the sensor values.")
-        print("| 4. help      - Display the description of available commands.")
-        print("| 5. exit      - Exit the CLI application.")
-        print("|--------------------------------|\n")
+        print("\n|-------------------- COMMAND EXPLANATION --------------------|")
+        print("| 1. configure - Configure ranges for actuator activation.      |")
+        print("| 2. status    - Check the actuator status.                     |")
+        print("| 3. monitor   - Monitor the sensor values.                     |")
+        print("| 4. help      - Display the description of available commands. |")
+        print("| 5. exit      - Exit the CLI application.                      |")
+        print("|---------------------------------------------------------------|\n")
 
 
     # Configurazione del client MQTT

@@ -6,7 +6,9 @@ PLATFORMS_EXCLUDE = sky z1
 
 # Include CoAP resources
 MODULES_REL += ./resources
-MODULES_REL += ../json_util
+
+# Include json parser library
+MODULES_REL += ../cJSON-master
 
 CONTIKI=../../..
 

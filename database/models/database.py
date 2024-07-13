@@ -1,6 +1,10 @@
 import mysql.connector
 from mysql.connector import Error
 import json
+import os
+
+# Get the absolute path of the directory of the current file
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 class Database:
     '''
@@ -34,7 +38,7 @@ class Database:
         '''
         return
     
-    def connect_db(self):
+    def connect(self):
         '''
         Connect to the MySQL database
         :return: Database connection object
@@ -47,7 +51,7 @@ class Database:
         else:
             try:
                 # import credentials.key file to get MySQL credentials
-                with open("../private/credential.json", "r") as file:
+                with open(os.path.join(dir_path, "../private/credential.json"), "r") as file:
                     self.credentials = json.load(file)
 
                 self.connection = mysql.connector.connect(host= self.credentials["MYSQL_HOST"],

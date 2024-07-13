@@ -26,5 +26,5 @@ CREATE TABLE telemetry (
     id INT AUTO_INCREMENT PRIMARY KEY,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     type VARCHAR(45),
-    value INT,
+    value FLOAT
 );

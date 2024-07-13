@@ -1,13 +1,13 @@
-
+import sys
+import json
 from coapthon.resources.resource import Resource
 from coapthon.server.coap import CoAP
 from coapthon.messages.response import Response
 from coapthon.messages.request import Request
 from coapthon import defines
-import json
-from mysql.connector import Error
+from .SystemActuatorData import SystemActuatorData as SAD
+sys.path.append("..")
 from database.models.database import Database
-from SystemActuatorData import SystemActuatorData as SAD
     
 ''' This module contains the Registration class which is a CoAP resource that handles GET requests for actuator registration. '''
 
@@ -20,12 +20,10 @@ class Registration(Resource):
         connection: Database connection object
 
     Methods:
-        render_GET: Handle GET requests for the resource
+        render_POST: Handle GET requests for the resource
         register_actuator: Register an actuator in the database and create an observer for it
         insert_actuator: Insert a new actuator into the database
     '''
-
-    COAP_PORT = 5683
 
     def __init__(self, name="Registration", coap_server=None):
         '''
@@ -40,7 +38,7 @@ class Registration(Resource):
         self.payload = "Registration Resource"
         # Initialize the database
         self.database = Database()
-        self.connection = self.database.connect_db()
+        self.connection = self.database.connect()
         self.actuators = SAD.actuators
     
     def render_POST(self, request):
@@ -49,9 +47,6 @@ class Registration(Resource):
         :param request: Request object
         :return: Resource object
         '''
-        print("POST Registration Resource: " + request.source + " with payload " + str(request.payload))
-
-        response = Response()
 
         # Parse the payload
         try:
@@ -59,17 +54,20 @@ class Registration(Resource):
         
         # Handle JSON parsing errors
         except json.JSONDecodeError:
-            response.code = defines.Codes.BAD_REQUEST.number
-            response.payload = "Invalid JSON format"
-            return response
+            print("Invalid JSON format")
+            self.code = defines.Codes.BAD_REQUEST.number
+            self.payload = "Invalid JSON format"
+            return self
         
         # Insert actuator into the database
         if "name" in payload and "status" in payload:
-            response.code = self.insert_actuator(payload["name"], request.source)
+            self.code = self.insert_actuator(payload["name"], request.source)
         else:
-            response.code = defines.Codes.BAD_REQUEST.number
-        
-        return response
+            print("Invalid payload")
+            self.code = defines.Codes.BAD_REQUEST.number
+
+        self.destination = request.source
+        return self
     
     def insert_actuator(self, type, ip_port):
         '''
@@ -78,7 +76,7 @@ class Registration(Resource):
         :param ip_port: IP address and port number of the sensor
         :return: None
         '''
-        print(f"Inserting {type} actuator at {ip_port} into the database")
+        print(f"Inserting {type} actuator at {ip_port} into the database (initial status: off)")
 
         # Insert node info into Actuator table if not already present
         try:
@@ -90,26 +88,30 @@ class Registration(Resource):
                 insert_node_query = """
                 INSERT INTO actuator (ip_address, type, status) 
                 VALUES (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE  ip_address = %s, type = %s, status = %s
+                ON DUPLICATE KEY UPDATE  ip_address = %s, type = %s, status = %s;
                 """
                 cursor.execute(insert_node_query, (ip_port[0], type, "off", ip_port[0], type, "off"))   # Starting status is off
                 self.connection.commit()
-                cursor.close()
 
                 # Check if the actuator was inserted successfully
-                if cursor.rowcount < 1:
+                if cursor.rowcount < 0:
+                    print("Actuator not inserted")
+                    cursor.close()
                     return defines.Codes.INTERNAL_SERVER_ERROR.number
                 
                 # Return the success response code
                 else:
+                    cursor.close()
                     return defines.Codes.CREATED.number
-                cursor.close()
-            
+                
             # Return internal server error if database connection is lost
             else:
+                print("Database connection lost")
+                cursor.close()
                 return defines.Codes.INTERNAL_SERVER_ERROR.number
         
         # Handle database errors
-        except Error as e:
+        except Exception as e:
+            self.connection.rollback()
             print(f"Error inserting actuator into the database: {e}")
             return defines.Codes.INTERNAL_SERVER_ERROR.number
