@@ -5,17 +5,19 @@ from threading import Thread
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'COAP-Registration', 'models'))
+current_path = os.path.dirname(os.path.abspath(__file__)) 
+database_path = os.path.join(current_path, "../database")  
+sys.path.append(database_path)  
 
-from database import Database
+from models.database import Database
 
 # Inizializza la connessione al database utilizzando la classe Database singleton
 db_instance = Database()
-connection = db_instance.connect_db()
+connection = db_instance.connect()
 
 cursor = connection.cursor()
 
-query = "INSERT INTO dataSensed (timestamp, type, value) VALUES (%s, %s, %s)"
+query = "INSERT INTO telemetry (timestamp, type, value) VALUES (%s, %s, %s)"
 
 def on_connect_temp_ph_sal(client, userdata, flags, rc): 
     print("Connected with result code " + str(rc))
@@ -32,9 +34,13 @@ def on_message(client, userdata, msg):
     current_time = datetime.datetime.now()
 
     if msg.topic == "sensor/temp_pH_sal":
-        cursor.execute(query, (current_time, "temperature", data["temperature"]))
-        cursor.execute(query, (current_time, "pH", data["pH"]))
-        cursor.execute(query, (current_time, "salinity", data["salinity"]))
+            temperature = float(data["temperature"].replace(',', '.'))
+            pH = float(data["pH"].replace(',', '.'))
+            salinity = float(data["salinity"].replace(',', '.'))
+
+            cursor.execute(query, (current_time, "temperature", temperature))
+            cursor.execute(query, (current_time, "pH", pH))
+            cursor.execute(query, (current_time, "salinity", salinity))
     elif msg.topic == "sensor/so2":
         cursor.execute(query, (current_time, "SO2", data["so2"]))
 
