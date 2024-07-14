@@ -1,23 +1,39 @@
 import os
 import sys
 import time
+import datetime
 import paho.mqtt.client as mqtt
 import json
 import threading
 from queue import Queue, Empty
 import asyncio
 import signal
+from .PollingDB import PollingDB
+from .models.SO2Sensor import SO2Sensor
+from .models.TempSensor import TempSensor
+from .models.PHSensor import PHSensor
+from .models.SalinitySensor import SalinitySensor
+from DAO.ResourceDAO import ResourceDAO
 
 class ShutDownRequest(Exception):
     pass
 
 class CLI:
 
-    def __init__(self, sensor_map):
-        self.sensor_map = sensor_map
+    def __init__(self):
+        self.sensor_map = {
+            "SO2": SO2Sensor(),
+            "temperature": TempSensor(),
+            "pH": PHSensor(),
+            "salinity": SalinitySensor()
+        }
         self.publish_queue = Queue() # queue that allows publisher thread to communicate with main thread and publish data
         self.stop_event = threading.Event()
         self.publisher_thread = threading.Thread(target=self.mqtt_publisher_thread, args=("127.0.0.1", 1883, self.stop_event, self.publish_queue))
+        self.pickling_starting_time = None
+        self.polling_task = None
+        self.polling_db = PollingDB(self.sensor_map)
+
 
     async def start(self):
 
@@ -26,7 +42,7 @@ class CLI:
         '''
 
         print(r'''
-            _                  _    _                  ____                          
+             _                  _    _                  ____                          
             | |     ___   __ _ | |_ | |__    ___  _ __ / ___|   ___  _ __   ___   ___ 
             | |    / _ \ / _` || __|| '_ \  / _ \| '__|\___ \  / _ \| '_ \ / __| / _ \
             | |___|  __/| (_| || |_ | | | ||  __/| |    ___) ||  __/| | | |\__ \|  __/
@@ -38,21 +54,30 @@ class CLI:
 
         try:
             while 1:
-                self.CommandList()
+                self.commandList()
                 command = await asyncio.get_event_loop().run_in_executor(None, input, "COMMAND> ")
                 await self.handleCommand(command.lower())
         except KeyboardInterrupt:
             print("\nExiting...")
             self.stop_event.set()
             self.publisher_thread.join()
+            if self.pickling_starting_time is not None:
+                await self.stop_pickling()
             sys.exit(0)
     
     async def handleCommand(self, command):
         if command == "configure":
             await self.configure()
-        elif command == "status":
-            await self.status()
+        elif command == "settings":
+            await self.settings()
+        elif command == "start pickling" and self.pickling_starting_time is None:
+            await self.start_pickling()
+        elif command == "stop pickling" and self.pickling_starting_time is not None:
+            await self.stop_pickling()
         elif command == "monitor":
+            if self.pickling_starting_time is None:
+                print("Pickling process is not started yet. Please start the pickling process first.")
+                return
             asyncio.get_event_loop().add_signal_handler(signal.SIGINT, self.stop_monitor)
             await self.monitor()
             asyncio.get_event_loop().remove_signal_handler(signal.SIGINT)
@@ -62,20 +87,25 @@ class CLI:
             print("Exiting...")
             self.stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
             self.publisher_thread.join()  # Attendi che il thread MQTT termini.
+            if self.pickling_starting_time is not None:
+                await self.stop_pickling()
             raise ShutDownRequest()       
             
         else:
             print("Invalid command. Type 'help' for available commands.")
 
-    @staticmethod
-    def CommandList():
-        print("\n\n|----- AVAILABLE COMMANDS -----|")
-        print("| 1. configure                 |")
-        print("| 2. status                    |")
-        print("| 3. monitor                   |")
-        print("| 4. help                      |")
-        print("| 5. exit                      |")
-        print("|------------------------------|\n")
+    def commandList(self):
+        print("\n\n+----- AVAILABLE COMMANDS ------+")
+        print("| 1. configure                  |")
+        print("| 2. settings                   |")
+        if self.pickling_starting_time is None:
+            print("| 3. start pickling             |")
+        else:
+            print("| 3. stop pickling              |")
+        print("| 4. monitor                    |")
+        print("| 5. help                       |")
+        print("| 6. exit                       |")
+        print("+-------------------------------+\n")
     
     async def configure(self):
         self.listOfsensors()
@@ -83,26 +113,24 @@ class CLI:
 
     @staticmethod
     def listOfsensors():
-        print("\n|----- AVAILABLE SENSORS -----|\n")
+        print("\n+----- AVAILABLE SENSORS -----+\n")
         print("| 1. temperature              |\n")
         print("| 2. pH                       |\n")
         print("| 3. salinity                 |\n")
         print("| 4. exit                     |\n")
-        print("|-----------------------------|\n")
+        print("+-----------------------------+\n")
         
     async def getsensorvalues(self):
         while 1:
             sensor=await asyncio.get_event_loop().run_in_executor(None, input, "SENSOR> ")
-            sensor = sensor.lower()
-            if sensor == "temperature":
-                sensor = "temp"
-            
+            sensor = sensor
+
             if sensor in self.sensor_map.keys():
                 self.listOfparameters(sensor)
                 await self.getparameters(sensor)
                 break
             elif sensor == "exit":
-                self.CommandList()
+                self.commandList()
                 break
             else:
                 print("Invalid sensor. Please enter a valid sensor or exit.\n")
@@ -111,30 +139,30 @@ class CLI:
     @staticmethod
     def listOfparameters(sensor):
         if sensor == "temp":
-            print("\n|----- AVAILABLE PARAMETERS -----|\n")
+            print("\n+----- AVAILABLE PARAMETERS -----+\n")
             print("| 1. max                         |\n")
             print("| 2. delta                       |\n")
             print("| 3. both                        |\n")
             print("| 4. exit                        |\n")
-            print("|--------------------------------|\n")
+            print("+--------------------------------+\n")
         elif sensor == "ph":
-            print("\n|----- AVAILABLE PARAMETERS -----|\n")
+            print("\n+----- AVAILABLE PARAMETERS -----+\n")
             print("| 1. max                         |\n")
             print("| 2. min                         |\n")
             print("| 3. both                        |\n")
             print("| 4. delta                       |\n")
             print("| 5. all                         |\n")
             print("| 6. exit                        |\n")
-            print("|--------------------------------|\n")
+            print("+--------------------------------+\n")
         elif sensor == "salinity":
-            print("\n|----- AVAILABLE PARAMETERS -----|\n")
+            print("\n+----- AVAILABLE PARAMETERS -----+\n")
             print("| 1. max                         |\n")
             print("| 2. min                         |\n")
             print("| 3. both                        |\n")
             print("| 4. delta                       |\n")
             print("| 5. all                         |\n")
             print("| 6. exit                        |\n")
-            print("|--------------------------------|\n")
+            print("+--------------------------------+\n")
     
     async def getparameters(self,sensor):
         while 1:
@@ -147,7 +175,6 @@ class CLI:
                 await self.parametershandler(sensor, parameter)
                 break
             elif parameter == "exit":
-                self.CommandList()
                 break
             else:
                 print("Invalid parameter. Please enter a valid parameter or exit.\n")
@@ -269,11 +296,42 @@ class CLI:
                 except ValueError:
                     print("Invalid input. Please enter valid numbers.")
 
-    async def status(self):
+    async def start_pickling(self):
+        self.pickling_starting_time = datetime.datetime.now()
+
+        # Initialize actuators and start polling data
+        self.polling_task = asyncio.create_task(self.polling_db.start())
+
+        # Publish start pickling message to start data sensing
+        self.publish_queue.put(("pickling", {"value":"start"}))
+
+        print("\nPickling process STARTED at ", self.pickling_starting_time)
+        print("You can monitor the process by typing 'monitor'.")
+    
+    async def stop_pickling(self):    
+        print("\nPickling process STOPPED at ", datetime.datetime.now())
+        print("Pickling process age: ", datetime.datetime.now() - self.pickling_starting_time)
+
+        # Stop polling data and turn off actuators
+        if self.polling_task is not None:
+            await self.polling_db.stop()
+            self.polling_task.cancel()
+            try:
+                await self.polling_task
+            except asyncio.CancelledError:
+                print("Polling task stopped.")
+            self.polling_task = None
+
+        # Publish stop pickling message to avoid useless data sensing
+        self.publish_queue.put(("pickling", {"value":"stop"}))
+
+        self.pickling_starting_time = None
+
+    async def settings(self):
         for sensor in self.sensor_map.values():
             if sensor.type != "SO2":
                 print(f"{sensor.type.upper()} SENSOR:")
-                print(f"\tCurrent value {'UNKNOWN' if sensor.value is None else sensor.value}")
+                print(f"\t(Range-based sensor)")
                 if sensor.min is not None:
                     print(f"\tMin Value: {sensor.min}")
                 else:
@@ -285,7 +343,6 @@ class CLI:
                     print("\tDelta: Not Set")
         print(f"SO2 SENSOR:")
         print(f"\t(Detection-based sensor)")
-        print(f"\tCurrent value {'UNKNOWN' if self.sensor_map['SO2'].value is None else 'DETECTED' if int(self.sensor_map['SO2'].value) == 1 else 'NOT DETECTED'}")
         print(f"\t0 - No SO2 detected")
         print(f"\t1 - SO2 detected")
     
@@ -300,14 +357,21 @@ class CLI:
         self.running = True
         try:
             while self.running:
-                print("\n+-------------------------------+")
-                print("| SENSOR\t| VALUE\t\t|")
-                print("|---------------|---------------|")
-                print(f"| Temperature\t| {self.sensor_map['temperature'].value}\t\t|")
-                print(f"| pH\t\t| {self.sensor_map['pH'].value}\t\t|")
-                print(f"| Salinity\t| {self.sensor_map['salinity'].value}\t\t|")
-                print(f"| SO2\t\t| {'Detected' if int(self.sensor_map['SO2'].value) == 1 else 'Not detected'}\t|")
-                print("+-------------------------------+")
+                resource_status = {
+                    "fans": await ResourceDAO.retrieve_information("fans"),
+                    "pump": await ResourceDAO.retrieve_information("pump"),
+                    "alarm": await ResourceDAO.retrieve_information("alarm"),
+                    "locker": await ResourceDAO.retrieve_information("locker")
+                }
+                print("\nPickling process age: ", datetime.datetime.now() - self.pickling_starting_time)
+                print("+-------------------------------+\t+-------------------------------+")
+                print("| SENSOR\t| VALUE\t\t|\t| ACTUATOR\t| STATUS\t|")
+                print("+---------------+---------------+\t+---------------+---------------+")
+                print(f"| Temperature\t| {self.sensor_map['temperature'].value}\t\t|\t| Fans\t\t| " + (('both\t' if resource_status['fans'].status == 'both' else ('off\t' if resource_status['fans'].status == 'off' else resource_status['fans'].status)) if resource_status['fans'] is not None else 'None\t') + "\t|")
+                print(f"| pH\t\t| {self.sensor_map['pH'].value}\t\t|\t| Pump\t\t| {resource_status['pump'].status if resource_status['pump'] is not None else 'None'}\t\t|")
+                print(f"| Salinity\t| {self.sensor_map['salinity'].value}\t\t|\t| Alarm\t\t| {resource_status['alarm'].status if resource_status['alarm'] is not None else 'None'}\t\t|")
+                print(f"| SO2\t\t| " + ('Detected\t' if self.sensor_map['SO2'].value is not None and int(self.sensor_map['SO2'].value) == 1 else ('Not detected\t' if (self.sensor_map['SO2'].value is not None) else 'None\t\t') ) + f"|\t| Locker\t| {resource_status['locker'].status if resource_status['locker'] is not None else 'None'}\t\t|")
+                print("+-------------------------------+\t+-------------------------------+")
                 await asyncio.sleep(frequency)
         except KeyboardInterrupt:
             print("\nMonitoring stopped.")
@@ -317,13 +381,13 @@ class CLI:
 
     @staticmethod
     def help():
-        print("\n|--------------------- COMMAND EXPLANATION ---------------------|")
+        print("\n+--------------------- COMMAND EXPLANATION ---------------------+")
         print("| 1. configure - Configure ranges for actuator activation.      |")
-        print("| 2. status    - Check the settled ranges.                      |")
+        print("| 2. settings  - Check the settled ranges.                      |")
         print("| 3. monitor   - Monitor the sensor values.                     |")
         print("| 4. help      - Display the description of available commands. |")
         print("| 5. exit      - Exit the CLI application.                      |")
-        print("|---------------------------------------------------------------|\n")
+        print("+---------------------------------------------------------------+\n")
 
 
     # Configurazione del client MQTT
@@ -338,7 +402,6 @@ class CLI:
                     topic, data = publish_queue.get(timeout=1) #obtain data from queue, timeout needed to check if stop_event is set
                     payload = json.dumps(data) #convert data to JSON format
                     client.publish(topic, payload) #publish data in the topic
-                    print(f"Data published to {topic}: {payload}")
                 except Empty:
                     continue
         finally:

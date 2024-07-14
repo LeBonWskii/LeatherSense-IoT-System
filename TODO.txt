@@ -1,2 +1,0 @@
-- CLI
-- impostare avvio e terminazione processo di piclaggio (CLI)

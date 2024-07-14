@@ -22,15 +22,12 @@ class ResourceDAO:
     @staticmethod
     async def retrieve_information(actuator):
 
-        database = Database()
-        connection = database.connect()
-        prefix = "actuator_"
 
         try:
-            # Check if database connection is still active
-            if not connection.is_connected():
-                print("Database connection lost")
-                return None
+
+            database = Database()
+            connection = database.connect()
+            prefix = "actuator_"
             
             # Initialize resources list
             cursor = connection.cursor()
@@ -54,19 +51,20 @@ class ResourceDAO:
         except Error as e:
             print(f"[ResourceDAO] Error: {e}")
             return None
+        except asyncio.CancelledError:
+            return None
+        except Exception as e:
+            print(f"[ResourceDAO] Error: {e}")
+            return None
 
     async def update_status(self, new_status):
         if new_status == self.status:
             return
 
-        database = Database()
-        connection = database.connect()
-
         try:
-            # Check if database connection is still active
-            if not connection.is_connected():
-                print("Database connection lost")
-                return None
+            
+            database = Database()
+            connection = database.connect()
             
             cursor = connection.cursor()
             query = '''
@@ -80,12 +78,14 @@ class ResourceDAO:
             connection.commit()
 
             if row_changed == 0:
-                    raise Exception()
+                print(f"Error updating the status to {new_status}")
             else:
                 self.status = new_status
         
         except Error as e:
             print(f"Cannot connect the database! Error: {e}")
+        except asyncio.CancelledError:
+            return
         except Exception as e:
             print(f"Error while updating the status on the DB! Error: {e}")
     

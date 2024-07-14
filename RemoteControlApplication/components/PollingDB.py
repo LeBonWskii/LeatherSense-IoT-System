@@ -13,16 +13,22 @@ class PollingDB:
     def __init__(self, types):
         self.db = Database()
         self.connection = self.db.connect()
-        self.initiate_id()
         self.types = types
+        self.running = False
+        self.stopping = False
 
     async def start(self):
         '''
         Start the polling of the database
         '''
-        while True:
+        self.initiate_id()
+        self.initialize_sensors()
+        await self.initialize_actuators()
+        self.running = True
+        self.stopping = False
+        while self.running:
             await self.polling()
-            await asyncio.sleep(2)
+            await asyncio.sleep(1)
     
     def initiate_id(self):
         '''
@@ -46,6 +52,70 @@ class PollingDB:
         except mysql.connector.Error as e:
             print(f"Error: {e}")
 
+    def initialize_sensors(self):
+        '''
+        Initialize the sensors
+        '''
+        self.types["temperature"].value = None
+        self.types["pH"].value = None
+        self.types["salinity"].value = None
+        self.types["SO2"].value = None
+    
+    async def initialize_actuators(self):
+        '''
+        Initialize the actuators
+        '''
+        # Retrieve resource status
+        resource_status = {
+            "fans": await ResourceDAO.retrieve_information("fans"),
+            "pump": await ResourceDAO.retrieve_information("pump"),
+            "alarm": await ResourceDAO.retrieve_information("alarm"),
+            "locker": await ResourceDAO.retrieve_information("locker")
+        }
+        # Initialize actuators if they are connected
+        if resource_status["fans"] is not None:
+            await CoAPClient(resource_status["fans"], "off").run()
+        if resource_status["pump"] is not None:
+            await CoAPClient(resource_status["pump"], "off").run()
+        if resource_status["alarm"] is not None:
+            await CoAPClient(resource_status["alarm"], "off").run()
+        if resource_status["locker"] is not None:
+            await CoAPClient(resource_status["locker"], "off").run()
+        
+    async def stop(self):
+        '''
+        Stop the polling of the database and turn off all actuators
+        '''
+        self.stopping = True
+
+        # Retrieve resource status
+        resource_status = {
+            "fans": await ResourceDAO.retrieve_information("fans"),
+            "pump": await ResourceDAO.retrieve_information("pump"),
+            "alarm": await ResourceDAO.retrieve_information("alarm"),
+            "locker": await ResourceDAO.retrieve_information("locker")
+        }
+        
+        # Turn off all actuators except the locker
+        if resource_status["fans"] is not None:
+            await CoAPClient(resource_status["fans"], "off").run()
+        if resource_status["pump"] is not None:
+            await CoAPClient(resource_status["pump"], "off").run()
+        if resource_status["alarm"] is not None:
+            await CoAPClient(resource_status["alarm"], "off").run()
+        
+        # Turn off the locker if it is connected only if SO2 is no more detected, otherwise keep it on
+        if resource_status["locker"] is not None:
+            if self.types["SO2"].value is not None and int(self.types["SO2"].value) == 1:
+                print("SO2 still detected, waiting for it to be no more detected before turning off locker...")
+                while self.types["SO2"].value is not None and int(self.types["SO2"].value) == 1:
+                    await asyncio.sleep(1)
+                print("SO2 no more detected, turning off locker!")
+            await CoAPClient(resource_status["locker"], "off").run()
+
+        self.initialize_sensors()
+
+        self.running = False
 
     async def polling(self):
         '''
@@ -85,7 +155,22 @@ class PollingDB:
         # Check values
         if new_id > self.last_id:
             self.last_id = new_id
-            await self.check_values()
+            if self.stopping:
+                await self.check_SO2()
+            else:
+                await self.check_values()
+    
+    async def check_SO2(self):
+        '''
+        Check the SO2 value and manage the locker resource accordingly
+        '''
+        # Retrieve resource status
+        resource_status = {
+            "locker": await ResourceDAO.retrieve_information("locker")
+        }
+        # Manage locker if it is connected
+        if resource_status["locker"] is not None:
+            await self.manage_locker(resource_status["locker"])
     
     async def check_values(self):
         '''
@@ -174,6 +259,28 @@ class PollingDB:
             # If SO2 is still detected and temperature is too high, turn on both fans
             elif self.types["SO2"].value == 1 and self.types["temperature"].value > self.types["temperature"].max:
                 await CoAPClient(resource, "both").run()
+        
+        elif resource.status == "both":
+            if self.types["temperature"].value is None:
+                if self.types["SO2"].value == 0 or self.types["SO2"].value is None:
+                    await CoAPClient(resource, "off").run()
+                return
+            if self.types["SO2"].value is None:
+                if self.types["temperature"].value > self.types["temperature"].max - self.types["temperature"].delta:
+                    await CoAPClient(resource, "cooling").run()
+                else:
+                    await CoAPClient(resource, "off").run()
+                return
+
+            # If SO2 is no more detected but temperature is still high, keep on the cooling fan
+            if self.types["SO2"].value == 0 and self.types["temperature"].value > self.types["temperature"].max - self.types["temperature"].delta:
+                await CoAPClient(resource, "cooling").run()
+            # If SO2 is no more detected and temperature is optimanl, turn off both fans
+            elif self.types["SO2"].value == 0 and self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta:
+                await CoAPClient(resource, "off").run()
+            # If temperature is optimal but SO2 is still detected, turn on exhaust fan
+            elif self.types["SO2"].value == 1 and self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta:
+                await CoAPClient(resource, "exhaust").run()
 
     async def manage_pump(self, resource):
         '''
