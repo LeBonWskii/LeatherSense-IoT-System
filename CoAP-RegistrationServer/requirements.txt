@@ -1,2 +1,0 @@
-coapthon
-mysql-connector-python
