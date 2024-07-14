@@ -82,8 +82,11 @@ static uint8_t state;
 #define STATE_WAITSUBACKPH          6
 #define STATE_SUBSCRIBEDPH          7
 #define STATE_WAITSUBACKSAL         8
-#define STATE_SUBSCRIBEDALL         9
-#define STATE_DISCONNECTED          10
+#define STATE_SUBSCRIBEDSAL         9
+#define STATE_WAITSTART             10
+#define STATE_START                 11
+#define STATE_STOP                  12
+#define STATE_DISCONNECTED          13
 
 //  STATE_SUBSCRIBEDTEMP. STATE_SUBSCRIBEDPH, STATE_SUBSCRIBEDSAL added only for major clarity but not required
 /*---------------------------------------------------------------------------*/
@@ -148,11 +151,12 @@ static double current_ph = 0;
 static double current_salinity = 0;
 
 /* Array of topics to subscribe to */
-static const char* topics[] = {"params/temperature", "params/ph", "params/salinity"}; 
+static const char* topics[] = {"params/temperature", "params/ph", "params/salinity", "pickling"}; 
 #define NUM_TOPICS 3
 static int current_topic_index = 0; // Index of the current topic being subscribed to
 static int count_sensor_interval = 0;//counter to check the number of times the sensor is activated
 static bool warning_status_active = false; //flag to check if the warning is active
+static bool start = false; //flag to check if the pickling process is started. 
 
 static char payload[BUFFER_SIZE];
 
@@ -207,7 +211,7 @@ void replace_comma_with_dot(char *str) {
 
 /*---------------------------------------------------------------------------*/
 static void sensor_callback(void *ptr){
-    if(state != STATE_SUBSCRIBEDALL) // Check if the sensor is subscribed to all topics
+    if(state != STATE_START) 
         return;
 
     // Generate random values for temperature, pH and salinity
@@ -313,7 +317,7 @@ static void sensor_callback(void *ptr){
       }
 
         /*else if values are not in range publish only after 3 times (15 seconds in warning status)*/
-      else if(count_sensor_interval == 3){
+      else if(count_sensor_interval == 2){
               sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
 
               cJSON *root = cJSON_CreateObject();
@@ -350,7 +354,7 @@ static void sensor_callback(void *ptr){
 
               // Publish JSON string
               mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
-              LOG_INFO("Publishing values on %s topic. Publishing reason: warning status disabled\n", pub_topic);
+              LOG_INFO("Publishing values on %s topic. Publishing reason: too much time spent without publishin in warning status\n", pub_topic);
               count_sensor_interval = 0;
               ctimer_reset(&tps_sensor_timer);
         }
@@ -399,13 +403,13 @@ static void sensor_callback(void *ptr){
 
               // Publish JSON string
               mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
-              LOG_INFO("Publishing values on %s topic. Publishing reason: warning status disabled\n", pub_topic);
+              LOG_INFO("Publishing values on %s topic. Publishing reason: detected values out of bounds\n", pub_topic);
               warning_status_active = true;
               count_sensor_interval = 0;
               ctimer_set(&tps_sensor_timer, MONITORING_INTERVAL, sensor_callback, NULL);
         }
         else{
-          /*else all is ok publish only after 3 times (30 seconds in normal status)*/
+          /*else all is ok publish only after 4 times (40 seconds in normal status)*/
             if(count_sensor_interval == 3){
                 sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
 
@@ -443,7 +447,7 @@ static void sensor_callback(void *ptr){
 
                 // Publish JSON string
                 mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
-                LOG_INFO("Publishing values on %s topic. Publishing reason: warning status disabled\n", pub_topic);
+                LOG_INFO("Publishing values on %s topic. Publishing reason: too much time spent without publishing in normal status\n", pub_topic);
                 count_sensor_interval = 0;
                 ctimer_reset(&tps_sensor_timer);
             }
@@ -463,6 +467,23 @@ AUTOSTART_PROCESSES(&sensor_temp_ph_sal);
 
 /*---------------------------------------------------------------------------*/
 /*Handler to manage the setting of parameters in case of publication on the topic to which the sensor is subscribed*/
+static void pub_handler_start(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
+    memcpy(payload, chunk, chunk_len);
+    payload[chunk_len] = '\0';
+    cJSON *json = cJSON_Parse(payload);
+    cJSON *str = cJSON_GetObjectItem(json, "value");
+    if(str){
+        if(state == STATE_WAITSTART && strcmp(str->valuestring, "start") == 0){
+            LOG_INFO("Start pickling process\n");
+            state = STATE_START;
+        }
+        else if(state == STATE_START && strcmp(str->valuestring, "stop") == 0){
+            LOG_INFO("Stop pickling process\n");
+            state = STATE_STOP;
+        }
+    }
+}
+
 static void pub_handler_temp(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
     memcpy(payload, chunk, chunk_len);
     payload[chunk_len] = '\0';
@@ -538,6 +559,7 @@ static void mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data
   case MQTT_EVENT_CONNECTED: {
     LOG_INFO("Application has a MQTT connection\n");
     state = STATE_CONNECTED;
+    current_topic_index = 0;
     break;
   }
   case MQTT_EVENT_DISCONNECTED: {
@@ -555,6 +577,8 @@ static void mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data
         pub_handler_ph(msg_ptr->topic, strlen(msg_ptr->topic), msg_ptr->payload_chunk, msg_ptr->payload_length);
     else if(strcmp(msg_ptr->topic, "params/salinity") == 0)
         pub_handler_sal(msg_ptr->topic, strlen(msg_ptr->topic), msg_ptr->payload_chunk, msg_ptr->payload_length);
+    else if (strcmp(msg_ptr->topic, "pickling") == 0)
+        pub_handler_start(msg_ptr->topic, strlen(msg_ptr->topic), msg_ptr->payload_chunk, msg_ptr->payload_length);
     break;
   }
   case MQTT_EVENT_SUBACK: {
@@ -677,16 +701,52 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
       }
     
     if(state == STATE_WAITSUBACKSAL && current_topic_index == 3)
-            state = STATE_SUBSCRIBEDALL;
-      
-      // Handle subscription states
-      if (state == STATE_SUBSCRIBEDALL) {
+            state = STATE_SUBSCRIBEDSAL;
+    
+    if(state == STATE_SUBSCRIBEDSAL){
+        strcpy(sub_topic, topics[current_topic_index]);
+        status=mqtt_subscribe(&conn, NULL, sub_topic, MQTT_QOS_LEVEL_0);
+        LOG_INFO("Subscribing to %s topic!\n", sub_topic);
+        if(status == MQTT_STATUS_OUT_QUEUE_FULL) {
+            LOG_ERR("Tried to subscribe to %s topic but command queue was full!\n", sub_topic);
+            PROCESS_EXIT();
+        }
+        if(!start){
+            state = STATE_WAITSTART;
+            LOG_INFO("Waiting for start command for temp_ph_sal sensor\n");
+        }
+        else{
+            state = STATE_START;
+            first_time = true;
+        }
+      }
+    
+        
+     
+      if (state == STATE_START) {
         // Start the timer for sensing values
         if(first_time){
             ctimer_set(&tps_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
             first_time = false;
+            start=true;
+            LOG_INFO("Sensor temp_ph_sal started successfully\n");
         }
-      } else if (state == STATE_DISCONNECTED) {
+      } 
+      else if (state == STATE_STOP){
+        ctimer_stop(&tps_sensor_timer);
+        first_time = true;
+        temp_out_of_bounds = false;
+        ph_out_of_bounds_min = false;
+        ph_out_of_bounds_max = false;
+        salinity_out_of_bounds_min = false;
+        salinity_out_of_bounds_max = false;
+        warning_status_active = false;
+        count_sensor_interval = 0;
+        state = STATE_WAITSTART;
+        start = false;
+         LOG_INFO("Sensor temp_ph_sal stopped successfully\n");
+      }
+       else if (state == STATE_DISCONNECTED) {
         LOG_ERR("Disconnected from MQTT broker\n");
         state = STATE_INIT;
         etimer_set(&reconnection_timer, RECONNECT_DELAY_MS);
