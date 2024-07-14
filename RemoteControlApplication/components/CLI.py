@@ -138,14 +138,14 @@ class CLI:
                 
     @staticmethod
     def listOfparameters(sensor):
-        if sensor == "temp":
+        if sensor == "temperature":
             print("\n+----- AVAILABLE PARAMETERS -----+\n")
             print("| 1. max                         |\n")
             print("| 2. delta                       |\n")
             print("| 3. both                        |\n")
             print("| 4. exit                        |\n")
             print("+--------------------------------+\n")
-        elif sensor == "ph":
+        elif sensor == "pH":
             print("\n+----- AVAILABLE PARAMETERS -----+\n")
             print("| 1. max                         |\n")
             print("| 2. min                         |\n")

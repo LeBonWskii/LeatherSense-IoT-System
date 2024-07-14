@@ -5,11 +5,7 @@ class SalinitySensor(Sensor):
     _instance = None
 
     def __init__(self):
-        super().__init__()
-        self._type = "salinity"
-        self._min = DefaultParameters.intervals["salinity"]["min"]
-        self._max = DefaultParameters.intervals["salinity"]["max"]
-        self._delta = DefaultParameters.intervals["salinity"]["delta"]
+        super().__init__("salinity", DefaultParameters.intervals["salinity"]["min"], DefaultParameters.intervals["salinity"]["max"], DefaultParameters.intervals["salinity"]["delta"])
 
     @classmethod
     def get_instance(cls):

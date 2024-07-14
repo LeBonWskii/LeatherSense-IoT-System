@@ -29,7 +29,6 @@ class CoAPClient:
             elif response.code == aiocoap.BAD_OPTION:
                 print("\nBAD_OPTION error", file=sys.stderr)
             else:
-                print(f"\n{self.resource_dao.get_resource()} error changing to {self.payload}!", file=sys.stderr)
                 await self.resource_dao.update_status("Error")
         
         except Exception as e:
