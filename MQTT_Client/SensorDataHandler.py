@@ -30,9 +30,9 @@ def on_connect_temp_ph_sal(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
     client.subscribe("sensor/temp_pH_sal")
 
-def on_connect_so2(client, userdata, flags, rc):
+def on_connect_h2s(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
-    client.subscribe("sensor/so2")
+    client.subscribe("sensor/h2s")
 
 def on_message(client, userdata, msg):
     print(msg.topic + " " + msg.payload.decode("utf-8", "ignore"))
@@ -48,8 +48,8 @@ def on_message(client, userdata, msg):
             cursor.execute(query, (current_time, "temperature", temperature))
             cursor.execute(query, (current_time, "pH", pH))
             cursor.execute(query, (current_time, "salinity", salinity))
-    elif msg.topic == "sensor/so2":
-        cursor.execute(query, (current_time, "SO2", data["so2"]))
+    elif msg.topic == "sensor/h2s":
+        cursor.execute(query, (current_time, "H2S", data["h2s"]))
 
     connection.commit()
 
@@ -57,8 +57,8 @@ def mqtt_client(topic):
     client = mqtt.Client(protocol=mqtt.MQTTv311)
     if topic == "sensor/temp_pH_sal":
         client.on_connect = on_connect_temp_ph_sal
-    elif topic == "sensor/so2":
-        client.on_connect = on_connect_so2
+    elif topic == "sensor/h2s":
+        client.on_connect = on_connect_h2s
     client.on_message = on_message
 
     client.connect("127.0.0.1", 1883, 60)
@@ -67,7 +67,7 @@ def mqtt_client(topic):
 def main():
     try:
         Thread(target=mqtt_client, args=("sensor/temp_pH_sal",)).start()
-        Thread(target=mqtt_client, args=("sensor/so2",)).start()
+        Thread(target=mqtt_client, args=("sensor/h2s",)).start()
     except KeyboardInterrupt:
         print("Exiting...")
         sys.exit()

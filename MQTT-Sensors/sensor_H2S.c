@@ -122,9 +122,9 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 /*Utility variables*/
 
 /*variable for sensing values*/
-static int current_so2 = 0;
+static int current_h2s = 0;
 
-static struct ctimer so2_sensor_timer; //timer for periodic sensing values of temperature, pH and salinity
+static struct ctimer h2s_sensor_timer; //timer for periodic sensing values of temperature, pH and salinity
 static bool first_time = true; //flag to check if it is the first time the sensor is activated
 static bool warning_status_active = false; //flag to check if the warning status is active
 static int count_sensor_interval = 0; //counter for the number of times the sensor interval has been reached
@@ -136,7 +136,7 @@ static bool start = false; //flag to check if the sensor has started
 /*---------------------------------------------------------------------------*/
 /*Utility function for generate random sensing values*/
 
-static int generate_random_so2(){
+static int generate_random_h2s(){
     
    int r = rand() % 10;
         
@@ -151,60 +151,60 @@ static int generate_random_so2(){
 /*---------------------------------------------------------------------------*/
 static void sensor_callback(void *ptr){
     // Generate random values for temperature, pH and salinity
-    current_so2 = generate_random_so2();
-    if(current_so2)
-        LOG_INFO("*WARNING* SO2 DETECTED\n");
+    current_h2s = generate_random_h2s();
+    if(current_h2s)
+        LOG_INFO("*WARNING* H2S DETECTED\n");
     else
-        LOG_INFO("SO2 NOT DETECTED\n");
+        LOG_INFO("H2S NOT DETECTED\n");
     if(warning_status_active){
 
-        if(!current_so2){
-            sprintf(pub_topic, "%s", "sensor/so2"); //publish on the topic sensor/so2
-            sprintf(app_buffer, "{ \"so2\": %d }", current_so2);
+        if(!current_h2s){
+            sprintf(pub_topic, "%s", "sensor/h2s"); //publish on the topic sensor/h2s
+            sprintf(app_buffer, "{ \"h2s\": %d }", current_h2s);
             mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
             LOG_INFO("Publishing values on %s topic. Publishing reason: warning status disabled\n", pub_topic);
             warning_status_active = false;
             count_sensor_interval = 0;
-            ctimer_set(&so2_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
+            ctimer_set(&h2s_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
         }
         /*else if values are not in range publish only after 3 times (15 seconds in warning status)*/
         else if(count_sensor_interval == 3){
-            sprintf(pub_topic, "%s", "sensor/so2"); //publish on the topic sensor/so2
-            sprintf(app_buffer, "{ \"so2\": %d }", current_so2);
+            sprintf(pub_topic, "%s", "sensor/h2s"); //publish on the topic sensor/h2s
+            sprintf(app_buffer, "{ \"h2s\": %d }", current_h2s);
             mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
             LOG_INFO("Publishing values on %s topic. Publishing reason: too much time spent without publishing in warning status\n", pub_topic);
             count_sensor_interval = 0;
-            ctimer_reset(&so2_sensor_timer);
+            ctimer_reset(&h2s_sensor_timer);
         }
         else{
             count_sensor_interval++;
-            ctimer_reset(&so2_sensor_timer);
+            ctimer_reset(&h2s_sensor_timer);
         }   
     }
     else{
       /*if are detected values out of bounds for the first time then publish data and set warning status on*/
-        if(current_so2){
-            sprintf(pub_topic, "%s", "sensor/so2"); //publish on the topic sensor/so2
-            sprintf(app_buffer, "{ \"so2\": %d }", current_so2);
+        if(current_h2s){
+            sprintf(pub_topic, "%s", "sensor/h2s"); //publish on the topic sensor/h2s
+            sprintf(app_buffer, "{ \"h2s\": %d }", current_h2s);
             mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
             LOG_INFO("Publishing values on %s topic. Publishing reason: values out of bounds\n", pub_topic);
             warning_status_active = true;
             count_sensor_interval = 0;
-            ctimer_set(&so2_sensor_timer, MONITORING_INTERVAL, sensor_callback, NULL);
+            ctimer_set(&h2s_sensor_timer, MONITORING_INTERVAL, sensor_callback, NULL);
         }
         else{
           /*else all is ok publish only after 3 times (30 seconds in normal status)*/
             if(count_sensor_interval == 3){
-                sprintf(pub_topic, "%s", "sensor/so2"); //publish on the topic sensor/so2
-                sprintf(app_buffer, "{ \"so2\": %d }", current_so2);
+                sprintf(pub_topic, "%s", "sensor/h2s"); //publish on the topic sensor/h2s
+                sprintf(app_buffer, "{ \"h2s\": %d }", current_h2s);
                 mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
                 LOG_INFO("Publishing values on %s topic. Publishing reason: too much time spent without publishing in normal status\n", pub_topic);
                 count_sensor_interval = 0;
-                ctimer_reset(&so2_sensor_timer);
+                ctimer_reset(&h2s_sensor_timer);
             }
             else{
                 count_sensor_interval++;
-                ctimer_reset(&so2_sensor_timer);
+                ctimer_reset(&h2s_sensor_timer);
             }
         }
     }
@@ -213,8 +213,8 @@ static void sensor_callback(void *ptr){
 
 }
 /*---------------------------------------------------------------------------*/
-PROCESS(sensor_so2, "MQTT sensor_so2");
-AUTOSTART_PROCESSES(&sensor_so2);
+PROCESS(sensor_h2s, "MQTT sensor_h2s");
+AUTOSTART_PROCESSES(&sensor_h2s);
 
 /*---------------------------------------------------------------------------*/
 static void pub_handler_start(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
@@ -245,7 +245,7 @@ static void mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data
   case MQTT_EVENT_DISCONNECTED: {
     LOG_INFO("MQTT Disconnect. Reason %u\n", *((mqtt_event_t *)data));
     state = STATE_DISCONNECTED;
-    process_poll(&sensor_so2);
+    process_poll(&sensor_h2s);
     break;
   }
   case MQTT_EVENT_PUBLISH: {
@@ -294,11 +294,11 @@ static bool have_connectivity(void){
 }
 
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(sensor_so2, ev, data)
+PROCESS_THREAD(sensor_h2s, ev, data)
 {
   PROCESS_BEGIN();
   
-  LOG_INFO("MQTT-Sensor-SO2 started\n");
+  LOG_INFO("MQTT-Sensor-H2S started\n");
 
   // Initialize the ClientID as MAC address
   snprintf(client_id, BUFFER_SIZE, "%02x%02x%02x%02x%02x%02x",
@@ -307,7 +307,7 @@ PROCESS_THREAD(sensor_so2, ev, data)
                      linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
 
   // Broker registration
-  mqtt_register(&conn, &sensor_so2, client_id, mqtt_event, MAX_TCP_SEGMENT_SIZE);
+  mqtt_register(&conn, &sensor_h2s, client_id, mqtt_event, MAX_TCP_SEGMENT_SIZE);
   
   state = STATE_INIT;
 
@@ -353,14 +353,14 @@ PROCESS_THREAD(sensor_so2, ev, data)
 
       if(state == STATE_START){
         if(first_time){
-            ctimer_set(&so2_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
+            ctimer_set(&h2s_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
             first_time = false;
             start = true;
             LOG_INFO("Sensor H2S started successfully \n");
         }
       }
       else if(state == STATE_STOP){
-        ctimer_stop(&so2_sensor_timer);
+        ctimer_stop(&h2s_sensor_timer);
         start = false;
         first_time = true;
         warning_status_active = false;

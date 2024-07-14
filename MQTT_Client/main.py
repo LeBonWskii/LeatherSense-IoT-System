@@ -4,7 +4,7 @@ from MQTTClient import MQTTClient
 async def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
     await client.subscribe("sensor/temp_pH_sal")
-    await client.subscribe("sensor/so2")
+    await client.subscribe("sensor/h2s")
 
 async def on_message(client, userdata, msg):
     print(f"Received message on topic {msg.topic}: {msg.payload.decode()}")
