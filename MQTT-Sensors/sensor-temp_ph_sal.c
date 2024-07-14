@@ -38,7 +38,7 @@
 #include "sys/ctimer.h"
 #include "lib/sensors.h"
 #include "dev/button-hal.h"
-#include "dev/leds.h"
+#include "os/dev/leds.h"
 #include "os/sys/log.h"
 #include "mqtt-client.h"
 #include "os/dev/button-hal.h"
@@ -47,6 +47,9 @@
 #include <string.h>
 #include <strings.h>
 #include <stdbool.h>
+#include <math.h>
+#include <time.h>
+
 /*---------------------------------------------------------------------------*/
 #define LOG_MODULE "sensor-temp_ph_sal"
 #ifdef MQTT_CLIENT_CONF_LOG_LEVEL
@@ -73,8 +76,8 @@ static const char *broker_ip = MQTT_CLIENT_BROKER_IP_ADDR;
 /* Various states */
 static uint8_t state;
 
-#define STATE_INIT    		          0
-#define STATE_NET_OK    	          1
+#define STATE_INIT    		        0
+#define STATE_NET_OK    	        1
 #define STATE_CONNECTING            2
 #define STATE_CONNECTED             3
 #define STATE_WAITSUBACKTEMP        4
@@ -145,6 +148,14 @@ static double delta_temp = 5;
 static double delta_ph = 0.1;
 static double delta_salinity = 0.5;
 
+static double mean_temp = 20;
+static double stddev_temp = 3.13;
+static double mean_ph = 2.9;
+static double stddev_ph = 0.05;
+static double mean_salinity = 2.5;
+static double stddev_salinity = 0.25;
+
+
 /*variables for sensing values*/
 static double current_temp = 0;
 static double current_ph = 0;
@@ -164,6 +175,9 @@ static char payload[BUFFER_SIZE];
 static struct ctimer tps_sensor_timer; //timer for periodic sensing values of temperature, pH and salinity
 static bool first_time = true; //flag to check if it is the first time the sensor is activated
 static struct etimer reconnection_timer; //timer for reconnection to the broker
+static int button_press_count = 0; //counter for button press
+#define BUTTON_INTERVAL (CLOCK_SECOND * 3) //interval for button press
+static struct etimer button_timer; //timer for button press
 
 #define SENSOR_INTERVAL (CLOCK_SECOND * 10) //interval for sensing values of temperature, pH and salinity
 #define MONITORING_INTERVAL (CLOCK_SECOND * 5) //interval for monitoring the values of temperature, pH and salinity if they are out of bounds
@@ -171,32 +185,40 @@ static struct etimer reconnection_timer; //timer for reconnection to the broker
 /*---------------------------------------------------------------------------*/
 /*Utility functions for generate random sensing values*/
 
-static double generate_random_temp() {
-    
-    double random_fraction = (double)rand() / RAND_MAX;
+static double generate_gaussian_noise(double mean, double stddev) {
+    static bool has_spare = false;
+    static double spare;
+    if (has_spare) {
+        has_spare = false;
+        return mean + stddev * spare;
+    }
 
-    
-    if ((rand() % 100) < 80) 
-      return 5 + random_fraction * (max_temp_threshold - 5);
-    else 
-      return (max_temp_threshold + 1) + random_fraction * (delta_temp + 1);
+    has_spare = true;
+    static double u, v, s;
+    do {
+        u = (rand() / ((double) RAND_MAX)) * 2.0 - 1.0;
+        v = (rand() / ((double) RAND_MAX)) * 2.0 - 1.0;
+        s = u * u + v * v;
+    } while (s >= 1.0 || s == 0.0);
+
+    s = sqrt(-2.0 * log(s) / s);
+    spare = v * s;
+    return mean + stddev * u * s;
+}
+
+static double generate_random_temp() {
+    return generate_gaussian_noise(mean_temp, stddev_temp);
     
 }
 
 
 static double generate_random_ph() {
-    
-    double random_fraction = (double)rand() / RAND_MAX;
-
-    return min_ph_threshold + random_fraction * (max_ph_threshold - min_ph_threshold);
+     return generate_gaussian_noise(mean_ph, stddev_ph);
 }
 
 
 static double generate_random_salinity() {
-    
-    double random_fraction = (double)rand() / RAND_MAX;
-
-    return min_salinity_threshold + random_fraction * (max_salinity_threshold - min_salinity_threshold);
+    return generate_gaussian_noise(mean_salinity, stddev_salinity);
 }
 
 void replace_comma_with_dot(char *str) {
@@ -731,6 +753,7 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
             start=true;
             LOG_INFO("Sensor temp_ph_sal started successfully\n");
         }
+        srand(time(NULL));
       } 
       else if (state == STATE_STOP){
         ctimer_stop(&tps_sensor_timer);
@@ -756,7 +779,40 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
       
       etimer_set(&periodic_timer, STATE_MACHINE_PERIODIC);
     }
+    else if(ev == button_hal_press_event){
+        if(state == STATE_START){
+            if(button_press_count == 0){
+                etimer_set(&button_timer, BUTTON_INTERVAL);
+                button_press_count++;
+            }
+            else if(button_press_count <7)
+                button_press_count++;
+    }
+}
+    else if(ev == PROCESS_EVENT_TIMER && data == &button_timer){
+        switch(button_press_count){
+            case 1:
+                mean_temp+=stddev_temp;
+                break;
+            case 2:
+                mean_ph+=stddev_ph;
+                break;
+            case 3:
+                mean_salinity+=stddev_salinity;
+                break;
+            case 4:
+                mean_temp-=stddev_temp;
+                break;
+            case 5:
+                mean_ph-=stddev_ph;
+                break;
+            case 6:
+                mean_salinity-=stddev_salinity;
+                break;
+        }
+        button_press_count = 0;
   }
 
+    }
   PROCESS_END();
 }

@@ -123,6 +123,7 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 
 /*variable for sensing values*/
 static int current_h2s = 0;
+static int generated_value = 0;
 
 static struct ctimer h2s_sensor_timer; //timer for periodic sensing values of temperature, pH and salinity
 static bool first_time = true; //flag to check if it is the first time the sensor is activated
@@ -136,22 +137,14 @@ static bool start = false; //flag to check if the sensor has started
 /*---------------------------------------------------------------------------*/
 /*Utility function for generate random sensing values*/
 
-static int generate_random_h2s(){
-    
-   int r = rand() % 10;
-        
-    if (r < 8) 
-        return 1;
-     else 
-        return 0;
-    
-} 
-
+static int generate_h2s(){
+  return generated_value;
+}  
 
 /*---------------------------------------------------------------------------*/
 static void sensor_callback(void *ptr){
     // Generate random values for temperature, pH and salinity
-    current_h2s = generate_random_h2s();
+    current_h2s = generate_h2s();
     if(current_h2s)
         LOG_INFO("*WARNING* H2S DETECTED\n");
     else
@@ -232,6 +225,11 @@ static void pub_handler_start(const char *topic, uint16_t topic_len, const uint8
             state = STATE_STOP;
         }
     }
+}
+
+static void button_callback_handler(){
+    if(state == STATE_START)
+      generated_value = !generated_value;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -376,6 +374,9 @@ PROCESS_THREAD(sensor_h2s, ev, data)
 
       }
       etimer_set(&periodic_timer, STATE_MACHINE_PERIODIC);
+    }
+    else if(ev == button_hal_press_event){
+      button_callback_handler();
     }
   }
 
