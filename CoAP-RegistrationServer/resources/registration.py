@@ -112,6 +112,5 @@ class Registration(Resource):
         
         # Handle database errors
         except Exception as e:
-            self.connection.rollback()
             print(f"Error inserting actuator into the database: {e}")
             return defines.Codes.INTERNAL_SERVER_ERROR.number

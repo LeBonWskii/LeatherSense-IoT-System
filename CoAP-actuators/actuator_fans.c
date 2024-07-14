@@ -14,7 +14,7 @@
 /* ---------------------------------------------- */
 
 #include "sys/log.h"
-#define LOG_MODULE "Actuator fans"
+#define LOG_MODULE "Fans - actuator"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 
@@ -110,7 +110,7 @@ PROCESS_THREAD(actuator_fans, ev, data){
     
 
 	/* ----------- Resource activation ----------- */
-    coap_activate_resource(&res_fans, "fans");
+    coap_activate_resource(&res_fans, "actuator_fans");
 
 
     PROCESS_YIELD();

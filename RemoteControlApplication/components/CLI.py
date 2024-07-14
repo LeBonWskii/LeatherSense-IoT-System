@@ -6,6 +6,7 @@ import json
 import threading
 from queue import Queue, Empty
 import asyncio
+import signal
 
 class ShutDownRequest(Exception):
     pass
@@ -33,20 +34,18 @@ class CLI:
                                                                                                                                                                                     
         ''')
 
-        self.CommandList()
-
         self.publisher_thread.start()
 
         try:
             while 1:
+                self.CommandList()
                 command = await asyncio.get_event_loop().run_in_executor(None, input, "COMMAND> ")
                 await self.handleCommand(command.lower())
-        
         except KeyboardInterrupt:
-            print("SHUTDOWN")
-            self.stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
-            self.publisher_thread.join()  # Attendi che il thread MQTT termini.
-            os._exit(0)
+            print("\nExiting...")
+            self.stop_event.set()
+            self.publisher_thread.join()
+            sys.exit(0)
     
     async def handleCommand(self, command):
         if command == "configure":
@@ -54,7 +53,9 @@ class CLI:
         elif command == "status":
             await self.status()
         elif command == "monitor":
+            asyncio.get_event_loop().add_signal_handler(signal.SIGINT, self.stop_monitor)
             await self.monitor()
+            asyncio.get_event_loop().remove_signal_handler(signal.SIGINT)
         elif command == "help":
             self.help()
         elif command == "exit":
@@ -68,7 +69,7 @@ class CLI:
 
     @staticmethod
     def CommandList():
-        print("\n|----- AVAILABLE COMMANDS -----|")
+        print("\n\n|----- AVAILABLE COMMANDS -----|")
         print("| 1. configure                 |")
         print("| 2. status                    |")
         print("| 3. monitor                   |")
@@ -160,8 +161,12 @@ class CLI:
                     maxvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MAX VALUE> ")
                     maxvalue = round(float(maxvalue), 2)
                     
-                    if sensor.min>maxvalue:
+                    if sensor.min is not None and sensor.min>maxvalue:
                         print(f"Invalid input. The maximum value {maxvalue} must be greater than the actual minimum value {sensor.min}.")
+                        continue
+                    
+                    if sensor.type == "temperature" and maxvalue < 5:
+                        print(f"Invalid input. The maximum value {maxvalue} for temperature sensor must be greater than 5.")
                         continue
 
                     sensor.max = maxvalue
@@ -264,11 +269,57 @@ class CLI:
                 except ValueError:
                     print("Invalid input. Please enter valid numbers.")
 
+    async def status(self):
+        for sensor in self.sensor_map.values():
+            if sensor.type != "SO2":
+                print(f"{sensor.type.upper()} SENSOR:")
+                print(f"\tCurrent value {'UNKNOWN' if sensor.value is None else sensor.value}")
+                if sensor.min is not None:
+                    print(f"\tMin Value: {sensor.min}")
+                else:
+                    print("\tMin Value: Not Set")
+                print(f"\tMax Value: {sensor.max}")
+                if sensor.delta is not None:
+                    print(f"\tDelta: {sensor.delta}")
+                else:
+                    print("\tDelta: Not Set")
+        print(f"SO2 SENSOR:")
+        print(f"\t(Detection-based sensor)")
+        print(f"\tCurrent value {'UNKNOWN' if self.sensor_map['SO2'].value is None else 'DETECTED' if int(self.sensor_map['SO2'].value) == 1 else 'NOT DETECTED'}")
+        print(f"\t0 - No SO2 detected")
+        print(f"\t1 - SO2 detected")
+    
+    async def monitor(self):
+        print("Enter the frequency of monitoring in seconds:")
+        frequency = await asyncio.get_event_loop().run_in_executor(None, input, "FREQUENCY>: ")
+        if not frequency.isdigit():
+            frequency = 5
+        else:
+            frequency = int(frequency)
+        print(f"Monitoring sensor values every {frequency} seconds.\nPress Ctrl+C to stop monitoring.")
+        self.running = True
+        try:
+            while self.running:
+                print("\n+-------------------------------+")
+                print("| SENSOR\t| VALUE\t\t|")
+                print("|---------------|---------------|")
+                print(f"| Temperature\t| {self.sensor_map['temperature'].value}\t\t|")
+                print(f"| pH\t\t| {self.sensor_map['pH'].value}\t\t|")
+                print(f"| Salinity\t| {self.sensor_map['salinity'].value}\t\t|")
+                print(f"| SO2\t\t| {'Detected' if int(self.sensor_map['SO2'].value) == 1 else 'Not detected'}\t|")
+                print("+-------------------------------+")
+                await asyncio.sleep(frequency)
+        except KeyboardInterrupt:
+            print("\nMonitoring stopped.")
+        
+    def stop_monitor(self):
+        self.running = False
+
     @staticmethod
     def help():
         print("\n|--------------------- COMMAND EXPLANATION ---------------------|")
         print("| 1. configure - Configure ranges for actuator activation.      |")
-        print("| 2. status    - Check the actuator status.                     |")
+        print("| 2. status    - Check the settled ranges.                      |")
         print("| 3. monitor   - Monitor the sensor values.                     |")
         print("| 4. help      - Display the description of available commands. |")
         print("| 5. exit      - Exit the CLI application.                      |")

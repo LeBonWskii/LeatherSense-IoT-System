@@ -1,4 +1,5 @@
 import sys
+import asyncio
 from mysql.connector import Error
 sys.path.append("..")
 from database.models.database import Database
@@ -13,66 +14,70 @@ class ResourceDAO:
         status (str): The status of the actuator.
     '''
 
-    prefix = "actuator_"
-    _db = Database()
-    _connection = _db.connect()
-
     def __init__(self, ip, resource, status=None):
         self.ip = ip
-        self.resource = "{}{}".format(self.prefix, resource)
+        self.resource = resource
         self.status = status
 
     @staticmethod
-    def retrieve_information(actuator):
+    async def retrieve_information(actuator):
+
+        database = Database()
+        connection = database.connect()
+        prefix = "actuator_"
+
         try:
             # Check if database connection is still active
-            if not _connection.is_connected():
+            if not connection.is_connected():
                 print("Database connection lost")
                 return None
             
             # Initialize resources list
-            cursor = _connection.cursor()
+            cursor = connection.cursor()
             query = '''
-                SELECT ip, status 
-                FROM actuators 
-                WHERE resource = %s 
+                SELECT ip_address, status 
+                FROM actuator
+                WHERE type = %s 
                 LIMIT 1;
             '''
-            cursor.execute(query, (resource,))
-            _connection.commit()
-            cursor.close()
-
+            cursor.execute(query, ((prefix + actuator),))
             # Fetch the result
             result = cursor.fetchone()
+            cursor.close()
+            connection.commit()
+
             if result is None:
                 return None
             else:
-                return ResourceDAO(result[0], resource, result[1])
+                return ResourceDAO(result[0], (prefix + actuator), result[1])
         
         except Error as e:
             print(f"[ResourceDAO] Error: {e}")
             return None
 
-    def update_status(self, new_status):
+    async def update_status(self, new_status):
         if new_status == self.status:
             return
 
+        database = Database()
+        connection = database.connect()
+
         try:
             # Check if database connection is still active
-            if not _connection.is_connected():
+            if not connection.is_connected():
                 print("Database connection lost")
                 return None
             
-            cursor = _connection.cursor()
+            cursor = connection.cursor()
             query = '''
-                UPDATE actuators 
+                UPDATE actuator
                 SET status = %s 
-                WHERE ip = %s AND resource = %s;
+                WHERE ip_address = %s AND type = %s;
             '''
             cursor.execute(query, (new_status, self.ip, self.resource))
-            _connection.commit()
             row_changed = cursor.rowcount
             cursor.close()
+            connection.commit()
 
             if row_changed == 0:
                     raise Exception()
@@ -83,7 +88,7 @@ class ResourceDAO:
             print(f"Cannot connect the database! Error: {e}")
         except Exception as e:
             print(f"Error while updating the status on the DB! Error: {e}")
-
+    
     def get_ip(self):
         return f"[{self.ip}]"
 

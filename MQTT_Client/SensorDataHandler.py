@@ -4,6 +4,10 @@ import datetime
 from threading import Thread
 import sys
 import os
+import warnings
+
+# Suppress specific DeprecationWarning
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 current_path = os.path.dirname(os.path.abspath(__file__)) 
 database_path = os.path.join(current_path, "../database")  
@@ -17,7 +21,10 @@ connection = db_instance.connect()
 
 cursor = connection.cursor()
 
-query = "INSERT INTO telemetry (timestamp, type, value) VALUES (%s, %s, %s)"
+query = '''
+    INSERT INTO telemetry (timestamp, type, value) 
+    VALUES (%s, %s, %s);
+'''
 
 def on_connect_temp_ph_sal(client, userdata, flags, rc): 
     print("Connected with result code " + str(rc))
@@ -47,7 +54,7 @@ def on_message(client, userdata, msg):
     connection.commit()
 
 def mqtt_client(topic):
-    client = mqtt.Client()
+    client = mqtt.Client(protocol=mqtt.MQTTv311)
     if topic == "sensor/temp_pH_sal":
         client.on_connect = on_connect_temp_ph_sal
     elif topic == "sensor/so2":
@@ -58,8 +65,12 @@ def mqtt_client(topic):
     client.loop_forever()
 
 def main():
-    Thread(target=mqtt_client, args=("sensor/temp_pH_sal",)).start()
-    Thread(target=mqtt_client, args=("sensor/so2",)).start()
+    try:
+        Thread(target=mqtt_client, args=("sensor/temp_pH_sal",)).start()
+        Thread(target=mqtt_client, args=("sensor/so2",)).start()
+    except KeyboardInterrupt:
+        print("Exiting...")
+        sys.exit()
 
 if __name__ == "__main__":
     main()

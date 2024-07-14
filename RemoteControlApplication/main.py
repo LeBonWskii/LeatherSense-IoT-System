@@ -9,9 +9,9 @@ from components.models.SalinitySensor import SalinitySensor
 
 async def main():
     types = {
-        "so2": SO2Sensor(),
-        "temp": TempSensor(),
-        "ph": PHSensor(),
+        "SO2": SO2Sensor(),
+        "temperature": TempSensor(),
+        "pH": PHSensor(),
         "salinity": SalinitySensor()
     }
     try:
@@ -19,7 +19,7 @@ async def main():
         polling_db_task = asyncio.create_task(PollingDB(types).start())
         await asyncio.gather(cli_task, polling_db_task)
     except ShutDownRequest:
-        print("Shutting down...")
+        print("\nShutting down...")
 
 if __name__ == "__main__":
     asyncio.run(main())

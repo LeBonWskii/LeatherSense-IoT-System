@@ -14,7 +14,7 @@
 /* ---------------------------------------------- */
 
 #include "sys/log.h"
-#define LOG_MODULE "Actuator pump"
+#define LOG_MODULE "Pump - actuator"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 
@@ -110,7 +110,7 @@ PROCESS_THREAD(actuator_pump, ev, data){
     
 
 	/* ----------- Resource activation ----------- */
-    coap_activate_resource(&res_pump, "pump");
+    coap_activate_resource(&res_pump, "actuator_pump");
 
 
     PROCESS_YIELD();

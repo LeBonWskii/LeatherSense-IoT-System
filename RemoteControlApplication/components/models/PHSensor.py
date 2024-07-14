@@ -6,7 +6,7 @@ class PHSensor(Sensor):
 
     def __init__(self):
         super().__init__()
-        self._type = "ph"
+        self._type = "pH"
         self._min = DefaultParameters.intervals["ph"]["min"]
         self._max = DefaultParameters.intervals["ph"]["max"]
         self._delta = DefaultParameters.intervals["ph"]["delta"]

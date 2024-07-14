@@ -13,7 +13,7 @@
 /* ---------------------------------------------- */
 
 #include "sys/log.h"
-#define LOG_MODULE "App"
+#define LOG_MODULE "Alarm - resource"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 
@@ -70,7 +70,11 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
     // Check if the payload is not empty and retrieve the action
     if(len>0){
         cJSON *root = cJSON_ParseWithLength((const char *)chunk, len);
-        LOG_INFO("received payload: %s\n", cJSON_Print(root));
+        if(root == NULL) {
+            LOG_ERR("Failed to parse JSON\n");
+            coap_set_status_code(response, BAD_REQUEST_4_00);
+            return;
+        }
         action = cJSON_GetObjectItem(root, "action")->valuestring;
         LOG_INFO("received command: action=%s\n", action);
 	}
@@ -104,6 +108,8 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
             }
             else
                 LOG_WARN("Alarm is already on\n");
+            
+            coap_set_status_code(response, CHANGED_2_04);
         }
 
         // Invalid action, no change is performed

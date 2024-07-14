@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 class Sensor(ABC):
-    def __init__(self, type=None,min_value=None, max_value=None, delta=None, value=0):
+    def __init__(self, type=None,min_value=None, max_value=None, delta=None, value=None):
         self._type = type
         self._min = min_value
         self._max = max_value

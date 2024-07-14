@@ -14,7 +14,7 @@
 /* ---------------------------------------------- */
 
 #include "sys/log.h"
-#define LOG_MODULE "Actuator locker"
+#define LOG_MODULE "Fans - actuator"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 
@@ -110,7 +110,7 @@ PROCESS_THREAD(actuator_locker, ev, data){
     
 
 	/* ----------- Resource activation ----------- */
-    coap_activate_resource(&res_locker, "locker");
+    coap_activate_resource(&res_locker, "actuator_locker");
 
 
     PROCESS_YIELD();

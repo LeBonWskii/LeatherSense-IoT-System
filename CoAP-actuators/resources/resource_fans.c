@@ -13,7 +13,7 @@
 /* ---------------------------------------------- */
 
 #include "sys/log.h"
-#define LOG_MODULE "App"
+#define LOG_MODULE "Fans - resource"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 
@@ -76,7 +76,11 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
     // Check if the payload is not empty and retrieve the action
     if(len>0){
         cJSON *root = cJSON_ParseWithLength((const char *)chunk, len);
-        LOG_INFO("received payload: %s\n", cJSON_Print(root));
+        if(root == NULL) {
+            LOG_ERR("Failed to parse JSON\n");
+            coap_set_status_code(response, BAD_REQUEST_4_00);
+            return;
+        }
         action = cJSON_GetObjectItem(root, "action")->valuestring;
         LOG_INFO("received command: action=%s\n", action);
 	}
@@ -110,6 +114,8 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
             }
             else
                 LOG_WARN("Exhaust mode already on\n");
+            
+            coap_set_status_code(response, CHANGED_2_04);
         }
 
         // FANS_COOLING -> BLUE led
@@ -123,6 +129,8 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
             }
             else
                 LOG_WARN("Cooling mode already on\n");
+            
+            coap_set_status_code(response, CHANGED_2_04);
         }
 
         // FANS_BOTH -> RED led
@@ -132,10 +140,12 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
                 leds_off(LEDS_GREEN);
                 leds_on(LEDS_RED);
                 leds_off(LEDS_BLUE);
-                LOG_INFO("Fans are in both exhaust annd cooling modes\n");
+                LOG_INFO("Fans are in both exhaust and cooling modes\n");
             }
             else
                 LOG_WARN("Both modes already on\n");
+            
+            coap_set_status_code(response, CHANGED_2_04);
         }
 
         // Invalid action, no change is performed

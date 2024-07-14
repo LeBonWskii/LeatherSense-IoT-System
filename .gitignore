@@ -1,2 +1,5 @@
 .vscode
 CoAP-RegistrationServer/private/credential.json
+CoAP-actuators/build/
+MQTT-Sensors/build/
+rpl-border-router/build/

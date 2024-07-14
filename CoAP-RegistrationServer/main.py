@@ -14,7 +14,7 @@ def main():
         server.listen(10)
         
     except KeyboardInterrupt:
-        print("Server Shutdown")
+        print("\nServer Shutdown")
         server.close()
         print("Exiting...")
 

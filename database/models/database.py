@@ -16,7 +16,7 @@ class Database:
         credentials: MySQL credentials
         
     Methods:
-        connect_db: Connect to the MySQL database
+        connect: Connect to the MySQL database
     '''
     
     connection = None

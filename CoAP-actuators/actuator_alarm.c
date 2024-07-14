@@ -14,7 +14,7 @@
 /* ---------------------------------------------- */
 
 #include "sys/log.h"
-#define LOG_MODULE "Actuator alarm"
+#define LOG_MODULE "Alarm - actuator"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 
@@ -115,7 +115,7 @@ PROCESS_THREAD(actuator_alarm, ev, data){
     
 
 	/* ----------- Resource activation ----------- */
-    coap_activate_resource(&res_alarm, "alarm");
+    coap_activate_resource(&res_alarm, "actuator_alarm");
 
 
     PROCESS_YIELD();

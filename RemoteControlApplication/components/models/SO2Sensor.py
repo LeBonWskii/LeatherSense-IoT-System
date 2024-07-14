@@ -4,7 +4,7 @@ class SO2Sensor():
     _instance = None
 
     def __init__(self):
-        self._type = "so2"
+        self._type = "SO2"
         self._value = False
     
     @property
@@ -14,7 +14,11 @@ class SO2Sensor():
     @value.setter
     def value(self, value):
         self._value = value
-
+    
+    @property
+    def type(self):
+        return self._type
+    
     @classmethod
     def get_instance(cls):
         if cls._instance is None:

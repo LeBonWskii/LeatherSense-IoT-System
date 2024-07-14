@@ -13,7 +13,7 @@
 /* ---------------------------------------------- */
 
 #include "sys/log.h"
-#define LOG_MODULE "App"
+#define LOG_MODULE "Pump - resource"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 
@@ -42,42 +42,6 @@ const char* getPumpStatus(pump_status_t status){
             return "base";
         default:
             return "unknown";
-    }
-}
-
-// Set the leds according to the pump status
-void setPumpLeds(pump_status_t status){
-    switch(status){
-        case PUMP_OFF:  // GREEN
-            leds_off(LEDS_RED);
-            leds_off(LEDS_BLUE);
-            leds_on(LEDS_GREEN);
-            LOG_INFO("Pump is off\n");
-            break;
-        case PUMP_PURE: // YELLOW
-            leds_off(LEDS_BLUE);
-            leds_on(LEDS_GREEN);
-            leds_on(LEDS_RED);
-            LOG_INFO("Pump is in pure mode\n");
-            break;
-        case PUMP_ACID: // RED
-            leds_off(LEDS_GREEN);
-            leds_on(LEDS_RED);
-            leds_off(LEDS_BLUE);
-            LOG_INFO("Pump is in acid mode\n");
-            break;
-        case PUMP_BASE: // BLUE
-            leds_off(LEDS_GREEN);
-            leds_off(LEDS_RED);
-            leds_on(LEDS_BLUE);
-            LOG_INFO("Pump is in base mode\n");
-            break;
-        default:        // LEDS OFF
-            leds_off(LEDS_GREEN);
-            leds_off(LEDS_RED);
-            leds_off(LEDS_BLUE);
-            LOG_ERR("Pump status is unknown\n");
-            break;
     }
 }
 
@@ -112,19 +76,26 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
     // Check if the payload is not empty and retrieve the action
     if(len>0){
         cJSON *root = cJSON_ParseWithLength((const char *)chunk, len);
-        LOG_INFO("received payload: %s\n", cJSON_Print(root));
+        if(root == NULL) {
+            LOG_ERR("Failed to parse JSON\n");
+            coap_set_status_code(response, BAD_REQUEST_4_00);
+            return;
+        }
         action = cJSON_GetObjectItem(root, "action")->valuestring;
-        LOG_INFO("Detected command: action=%s\n", action);
+        LOG_INFO("received command: action=%s\n", action);
 	}
 
     // Check the action and set the pump status accordingly
     if(action!=NULL && strlen(action)!=0){
 
-        // PUMP_OFF
+        // PUMP_OFF -> GREEN led
         if((strncmp(action, getPumpStatus(PUMP_OFF), len) == 0)){
             if(pump_status != PUMP_OFF){
                 pump_status = PUMP_OFF;
-                setPumpLeds(pump_status);
+                leds_off(LEDS_RED);
+                leds_off(LEDS_BLUE);
+                leds_on(LEDS_GREEN);
+                LOG_INFO("Pump is off\n");
             }
             else
                 LOG_WARN("Pump is already off\n");
@@ -132,34 +103,49 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
 		    coap_set_status_code(response, CHANGED_2_04);
 	    }
 
-        //  PUMP_PURE
+        //  PUMP_PURE -> YELLOW led
         else if((strncmp(action, getPumpStatus(PUMP_PURE), len) == 0)){
             if(pump_status != PUMP_PURE){
                 pump_status = PUMP_PURE;
-                setPumpLeds(pump_status);
+                leds_off(LEDS_BLUE);
+                leds_on(LEDS_GREEN);
+                leds_on(LEDS_RED);
+                LOG_INFO("Pump is in pure mode\n");
             }
             else
                 LOG_WARN("Pump is already in pure mode\n");
+            
+            coap_set_status_code(response, CHANGED_2_04);
         }
 
-        // PUMP_ACID
+        // PUMP_ACID -> RED led
         else if((strncmp(action, getPumpStatus(PUMP_ACID), len) == 0)){
             if(pump_status != PUMP_ACID){
                 pump_status = PUMP_ACID;
-                setPumpLeds(pump_status);
+                leds_off(LEDS_GREEN);
+                leds_on(LEDS_RED);
+                leds_off(LEDS_BLUE);
+                LOG_INFO("Pump is in acid mode\n");
             }
             else
                 LOG_WARN("Pump is already in acid mode\n");
+            
+            coap_set_status_code(response, CHANGED_2_04);
         }
 
-        // PUMP_BASE
+        // PUMP_BASE -> BLUE led
         else if((strncmp(action, getPumpStatus(PUMP_BASE), len) == 0)){
             if(pump_status != PUMP_BASE){
                 pump_status = PUMP_BASE;
-                setPumpLeds(pump_status);
+                leds_off(LEDS_GREEN);
+                leds_off(LEDS_RED);
+                leds_on(LEDS_BLUE);
+                LOG_INFO("Pump is in base mode\n");
             }
             else
                 LOG_WARN("Pump is already in base mode\n");
+            
+            coap_set_status_code(response, CHANGED_2_04);
         }
 
         // Invalid action, no change is performed
