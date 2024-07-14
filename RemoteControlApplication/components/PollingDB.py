@@ -4,7 +4,7 @@ import mysql.connector
 from datetime import datetime
 from DAO.ResourceDAO import ResourceDAO
 from .CoAPClient import CoAPClient
-from .models import PHSensor, SalinitySensor, H2SSensor, TempSensor
+from .models import PHSensor, SalinitySensor, SO2Sensor, TempSensor
 sys.path.append("..")
 from database.models.database import Database
 
@@ -59,7 +59,7 @@ class PollingDB:
         self.types["temperature"].value = None
         self.types["pH"].value = None
         self.types["salinity"].value = None
-        self.types["H2S"].value = None
+        self.types["SO2"].value = None
     
     async def initialize_actuators(self):
         '''
@@ -104,13 +104,13 @@ class PollingDB:
         if resource_status["alarm"] is not None:
             await CoAPClient(resource_status["alarm"], "off").run()
         
-        # Turn off the locker if it is connected only if H2S is no more detected, otherwise keep it on
+        # Turn off the locker if it is connected only if SO2 is no more detected, otherwise keep it on
         if resource_status["locker"] is not None:
-            if self.types["H2S"].value is not None and int(self.types["H2S"].value) == 1:
-                print("H2S still detected, waiting for it to be no more detected before turning off locker...")
-                while self.types["H2S"].value is not None and int(self.types["H2S"].value) == 1:
+            if self.types["SO2"].value is not None and int(self.types["SO2"].value) == 1:
+                print("SO2 still detected, waiting for it to be no more detected before turning off locker...")
+                while self.types["SO2"].value is not None and int(self.types["SO2"].value) == 1:
                     await asyncio.sleep(1)
-                print("H2S no more detected, turning off locker!")
+                print("SO2 no more detected, turning off locker!")
             await CoAPClient(resource_status["locker"], "off").run()
 
         self.initialize_sensors()
@@ -156,13 +156,13 @@ class PollingDB:
         if new_id > self.last_id:
             self.last_id = new_id
             if self.stopping:
-                await self.check_H2S()
+                await self.check_SO2()
             else:
                 await self.check_values()
     
-    async def check_H2S(self):
+    async def check_SO2(self):
         '''
-        Check the H2S value and manage the locker resource accordingly
+        Check the SO2 value and manage the locker resource accordingly
         '''
         # Retrieve resource status
         resource_status = {
@@ -200,86 +200,86 @@ class PollingDB:
         '''
         if resource.status == "off":
             if self.types["temperature"].value is None:
-                if self.types["H2S"].value == 1:
+                if self.types["SO2"].value == 1:
                     await CoAPClient(resource, "exhaust").run()
                 return
-            if self.types["H2S"].value is None:
+            if self.types["SO2"].value is None:
                 if self.types["temperature"].value > self.types["temperature"].max:
                     await CoAPClient(resource, "cooling").run()
                 return
 
-            # If temperature is too high and H2S is detected, turn on both fans
-            if self.types["temperature"].value > self.types["temperature"].max and self.types["H2S"].value == 1:
+            # If temperature is too high and SO2 is detected, turn on both fans
+            if self.types["temperature"].value > self.types["temperature"].max and self.types["SO2"].value == 1:
                 await CoAPClient(resource, "both").run()
             # If temperature is too high, turn on cooling fan
             elif self.types["temperature"].value > self.types["temperature"].max:
                 await CoAPClient(resource, "cooling").run()
-            # If H2S is detected, turn on exhaust fan
-            elif self.types["H2S"].value == 1:
+            # If SO2 is detected, turn on exhaust fan
+            elif self.types["SO2"].value == 1:
                 await CoAPClient(resource, "exhaust").run()
         
         elif resource.status == "cooling":
             if self.types["temperature"].value is None:
-                if self.types["H2S"].value == 1:
+                if self.types["SO2"].value == 1:
                     await CoAPClient(resource, "exhaust").run()
                 else:
                     await CoAPClient(resource, "off").run()
                 return
-            if self.types["H2S"].value is None:
+            if self.types["SO2"].value is None:
                 if self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta:
                     await CoAPClient(resource, "off").run()
                 return
 
             # If temperature is optimal, turn off the fan
-            if self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta and self.types["H2S"].value == 0:
+            if self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta and self.types["SO2"].value == 0:
                 await CoAPClient(resource, "off").run()
-            # If temperature is still high and H2S is detected, turn on also exhaust fan
-            elif self.types["temperature"].value >= self.types["temperature"].max - self.types["temperature"].delta and self.types["H2S"].value == 1:
+            # If temperature is still high and SO2 is detected, turn on also exhaust fan
+            elif self.types["temperature"].value >= self.types["temperature"].max - self.types["temperature"].delta and self.types["SO2"].value == 1:
                 await CoAPClient(resource, "both").run()
-            # If temperature is optimal but H2S is detected, turn on exhaust fan
-            elif self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta and self.types["H2S"].value == 1:
+            # If temperature is optimal but SO2 is detected, turn on exhaust fan
+            elif self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta and self.types["SO2"].value == 1:
                 await CoAPClient(resource, "exhaust").run()
         
         elif resource.status == "exhaust":
             if self.types["temperature"].value is None:
-                if self.types["H2S"].value == 0 or self.types["H2S"].value is None:
+                if self.types["SO2"].value == 0 or self.types["SO2"].value is None:
                     await CoAPClient(resource, "off").run()
                 return
-            if self.types["H2S"].value is None:
+            if self.types["SO2"].value is None:
                 if self.types["temperature"].value > self.types["temperature"].max:
                     await CoAPClient(resource, "cooling").run()
                 return
 
-            # If H2S is no more detected and temperature is normal, turn off the fan
-            if self.types["H2S"].value == 0 and self.types["temperature"].value < self.types["temperature"].max:
+            # If SO2 is no more detected and temperature is normal, turn off the fan
+            if self.types["SO2"].value == 0 and self.types["temperature"].value < self.types["temperature"].max:
                 await CoAPClient(resource, "off").run()
-            # If H2S is no more detected but temperature is too high, turn on cooling fan
-            elif self.types["H2S"].value == 0 and self.types["temperature"].value > self.types["temperature"].max:
+            # If SO2 is no more detected but temperature is too high, turn on cooling fan
+            elif self.types["SO2"].value == 0 and self.types["temperature"].value > self.types["temperature"].max:
                 await CoAPClient(resource, "cooling").run()
-            # If H2S is still detected and temperature is too high, turn on both fans
-            elif self.types["H2S"].value == 1 and self.types["temperature"].value > self.types["temperature"].max:
+            # If SO2 is still detected and temperature is too high, turn on both fans
+            elif self.types["SO2"].value == 1 and self.types["temperature"].value > self.types["temperature"].max:
                 await CoAPClient(resource, "both").run()
         
         elif resource.status == "both":
             if self.types["temperature"].value is None:
-                if self.types["H2S"].value == 0 or self.types["H2S"].value is None:
+                if self.types["SO2"].value == 0 or self.types["SO2"].value is None:
                     await CoAPClient(resource, "off").run()
                 return
-            if self.types["H2S"].value is None:
+            if self.types["SO2"].value is None:
                 if self.types["temperature"].value > self.types["temperature"].max - self.types["temperature"].delta:
                     await CoAPClient(resource, "cooling").run()
                 else:
                     await CoAPClient(resource, "off").run()
                 return
 
-            # If H2S is no more detected but temperature is still high, keep on the cooling fan
-            if self.types["H2S"].value == 0 and self.types["temperature"].value > self.types["temperature"].max - self.types["temperature"].delta:
+            # If SO2 is no more detected but temperature is still high, keep on the cooling fan
+            if self.types["SO2"].value == 0 and self.types["temperature"].value > self.types["temperature"].max - self.types["temperature"].delta:
                 await CoAPClient(resource, "cooling").run()
-            # If H2S is no more detected and temperature is optimanl, turn off both fans
-            elif self.types["H2S"].value == 0 and self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta:
+            # If SO2 is no more detected and temperature is optimanl, turn off both fans
+            elif self.types["SO2"].value == 0 and self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta:
                 await CoAPClient(resource, "off").run()
-            # If temperature is optimal but H2S is still detected, turn on exhaust fan
-            elif self.types["H2S"].value == 1 and self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta:
+            # If temperature is optimal but SO2 is still detected, turn on exhaust fan
+            elif self.types["SO2"].value == 1 and self.types["temperature"].value < self.types["temperature"].max - self.types["temperature"].delta:
                 await CoAPClient(resource, "exhaust").run()
 
     async def manage_pump(self, resource):
@@ -418,19 +418,19 @@ class PollingDB:
         :param resource: The current status of the locker resource
         '''
         if resource.status == "off":
-            if self.types["H2S"].value is None:
+            if self.types["SO2"].value is None:
                 return
 
-            # If H2S is detected, turn on the locker
-            if int(self.types["H2S"].value) == 1:
+            # If SO2 is detected, turn on the locker
+            if int(self.types["SO2"].value) == 1:
                 await CoAPClient(resource, "on").run()
         
         elif resource.status == "on":
-            if self.types["H2S"].value is None:
+            if self.types["SO2"].value is None:
                 await CoAPClient(resource, "off").run()
                 return
 
-            # If H2S is no more detected, turn off the locker
-            if int(self.types["H2S"].value) == 0:
+            # If SO2 is no more detected, turn off the locker
+            if int(self.types["SO2"].value) == 0:
                 await CoAPClient(resource, "off").run()
     

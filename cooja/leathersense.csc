@@ -209,7 +209,7 @@
     </motetype>
     <motetype>
       org.contikios.cooja.contikimote.ContikiMoteType
-      <description>sensor_h2s</description>
+      <description>sensor_so2</description>
       <source>[CONFIG_DIR]/../MQTT-Sensors/sensor_S02.c</source>
       <commands>$(MAKE) -j$(CPUS) sensor_S02.cooja TARGET=cooja</commands>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>

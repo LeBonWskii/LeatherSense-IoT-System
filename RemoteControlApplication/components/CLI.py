@@ -9,7 +9,7 @@ from queue import Queue, Empty
 import asyncio
 import signal
 from .PollingDB import PollingDB
-from .models.H2SSensor import H2SSensor
+from .models.SO2Sensor import SO2Sensor
 from .models.TempSensor import TempSensor
 from .models.PHSensor import PHSensor
 from .models.SalinitySensor import SalinitySensor
@@ -22,7 +22,7 @@ class CLI:
 
     def __init__(self):
         self.sensor_map = {
-            "H2S": H2SSensor(),
+            "SO2": SO2Sensor(),
             "temperature": TempSensor(),
             "pH": PHSensor(),
             "salinity": SalinitySensor()
@@ -329,7 +329,7 @@ class CLI:
 
     async def settings(self):
         for sensor in self.sensor_map.values():
-            if sensor.type != "H2S":
+            if sensor.type != "SO2":
                 print(f"{sensor.type.upper()} SENSOR:")
                 print(f"\t(Range-based sensor)")
                 if sensor.min is not None:
@@ -341,10 +341,10 @@ class CLI:
                     print(f"\tDelta: {sensor.delta}")
                 else:
                     print("\tDelta: Not Set")
-        print(f"H2S SENSOR:")
+        print(f"SO2 SENSOR:")
         print(f"\t(Detection-based sensor)")
-        print(f"\t0 - No H2S detected")
-        print(f"\t1 - H2S detected")
+        print(f"\t0 - No SO2 detected")
+        print(f"\t1 - SO2 detected")
     
     async def monitor(self):
         print("Enter the frequency of monitoring in seconds:")
@@ -370,7 +370,7 @@ class CLI:
                 print(f"| Temperature\t| {self.sensor_map['temperature'].value}\t\t|\t| Fans\t\t| " + (('both\t' if resource_status['fans'].status == 'both' else ('off\t' if resource_status['fans'].status == 'off' else resource_status['fans'].status)) if resource_status['fans'] is not None else 'None\t') + "\t|")
                 print(f"| pH\t\t| {self.sensor_map['pH'].value}\t\t|\t| Pump\t\t| {resource_status['pump'].status if resource_status['pump'] is not None else 'None'}\t\t|")
                 print(f"| Salinity\t| {self.sensor_map['salinity'].value}\t\t|\t| Alarm\t\t| {resource_status['alarm'].status if resource_status['alarm'] is not None else 'None'}\t\t|")
-                print(f"| H2S\t\t| " + ('Detected\t' if self.sensor_map['H2S'].value is not None and int(self.sensor_map['H2S'].value) == 1 else ('Not detected\t' if (self.sensor_map['H2S'].value is not None) else 'None\t\t') ) + f"|\t| Locker\t| {resource_status['locker'].status if resource_status['locker'] is not None else 'None'}\t\t|")
+                print(f"| SO2\t\t| " + ('Detected\t' if self.sensor_map['SO2'].value is not None and int(self.sensor_map['SO2'].value) == 1 else ('Not detected\t' if (self.sensor_map['SO2'].value is not None) else 'None\t\t') ) + f"|\t| Locker\t| {resource_status['locker'].status if resource_status['locker'] is not None else 'None'}\t\t|")
                 print("+-------------------------------+\t+-------------------------------+")
                 await asyncio.sleep(frequency)
         except KeyboardInterrupt:

@@ -1,10 +1,10 @@
 from .config.DefaultParameters import DefaultParameters
 
-class H2SSensor():
+class SO2Sensor():
     _instance = None
 
     def __init__(self):
-        self._type = "H2S"
+        self._type = "SO2"
         self._value = False
     
     @property
