@@ -811,6 +811,7 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
                 break;
         }
         button_press_count = 0;
+        etimer_stop(&button_timer);
   }
 
     }
