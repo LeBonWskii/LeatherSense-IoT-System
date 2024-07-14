@@ -231,8 +231,8 @@ class CLI:
                     if(sensor.type== "temperature" and delta>sensor.max):
                         print(f"Invalid input. The delta value {delta} must be less or equal than the actual maximum value for temperature sensor {sensor.max}.")
                         continue
-                    elif(delta<(sensor.max-sensor.min)/2 or delta>sensor.max-sensor.min):
-                        print(f"Invalid input. The delta value {delta} must be between {(sensor.max-sensor.min)/2} and {sensor.max-sensor.min}.")
+                    elif(delta>sensor.max-sensor.min):
+                        print(f"Invalid input. The delta value {delta} must be less than {sensor.max-sensor.min}.")
                         continue
 
                     sensor.delta = delta
@@ -256,8 +256,8 @@ class CLI:
                         print(f"Invalid input. The minimum value {minvalue} must be less than the maximum value {maxvalue}.")
                         continue
 
-                    elif(delta<(maxvalue-minvalue)/2 or delta>maxvalue-minvalue):
-                        print(f"Invalid input. The delta value {delta} must be between {(maxvalue-minvalue)/2} and {maxvalue-minvalue}.")
+                    elif(delta>maxvalue-minvalue):
+                        print(f"Invalid input. The delta value {delta} must be less than {maxvalue-minvalue}.")
                         continue
 
                     sensor.max = maxvalue

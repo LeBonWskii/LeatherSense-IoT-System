@@ -127,8 +127,10 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 
 /*variables to report values outside the limits */
 static bool temp_out_of_bounds = false;
-static bool ph_out_of_bounds = false;
-static bool salinity_out_of_bounds = false;
+static bool ph_out_of_bounds_min = false;
+static bool ph_out_of_bounds_max = false;
+static bool salinity_out_of_bounds_min = false;
+static bool salinity_out_of_bounds_max = false;
 
 /*variables for sensing threshold*/
 static double max_temp_threshold = 25;
@@ -139,10 +141,6 @@ static double max_salinity_threshold = 3;
 static double delta_temp = 5;
 static double delta_ph = 0.1;
 static double delta_salinity = 0.5;
-
-static double temp_error_tolerance = 1.25;//delta_temp/4
-static double ph_error_tolerance =0.025; //delta_ph/4
-static double salinity_error_tolerance =0.125; //delta_salinity/4
 
 /*variables for sensing values*/
 static double current_temp = 0;
@@ -224,14 +222,26 @@ static void sensor_callback(void *ptr){
           temp_out_of_bounds = true;
       else
           temp_out_of_bounds = false;
-      if(current_ph < min_ph_threshold || current_ph > max_ph_threshold)
-          ph_out_of_bounds = true;
-      else
-          ph_out_of_bounds = false;
-      if(current_salinity < min_salinity_threshold || current_salinity > max_salinity_threshold)
-          salinity_out_of_bounds = true;
-      else
-          salinity_out_of_bounds = false;
+
+      if(current_ph < min_ph_threshold)
+          ph_out_of_bounds_min = true;
+      else if(current_ph > max_ph_threshold)
+          ph_out_of_bounds_max = true;
+      else{
+          ph_out_of_bounds_min = false;
+          ph_out_of_bounds_max = false;
+      }
+
+      if(current_salinity < min_salinity_threshold)
+          salinity_out_of_bounds_min = true;
+      else if(current_salinity > max_salinity_threshold)
+          salinity_out_of_bounds_max = true;
+      else{
+          salinity_out_of_bounds_min = false;
+          salinity_out_of_bounds_max = false;
+      }
+
+          
     }
     
 
@@ -239,16 +249,25 @@ static void sensor_callback(void *ptr){
 
     if(warning_status_active){
 
-      if(temp_out_of_bounds && current_temp <= max_temp_threshold - delta_temp - temp_error_tolerance)
+      if(temp_out_of_bounds && current_temp <= max_temp_threshold - delta_temp)
           temp_out_of_bounds = false;
-      if(ph_out_of_bounds && (current_ph >= max_ph_threshold - delta_ph - ph_error_tolerance && current_ph <= min_ph_threshold + delta_ph + ph_error_tolerance))
-          ph_out_of_bounds = false;
-      if(salinity_out_of_bounds && (current_salinity >= max_salinity_threshold - delta_salinity - salinity_error_tolerance && current_salinity <= min_salinity_threshold + delta_salinity + salinity_error_tolerance))
-          salinity_out_of_bounds = false;
+
+      if(ph_out_of_bounds_min && current_ph >= min_ph_threshold + delta_ph)
+          ph_out_of_bounds_min = false;
+
+      if(ph_out_of_bounds_max && current_ph <= max_ph_threshold - delta_ph)
+          ph_out_of_bounds_max = false;
+
+      if(salinity_out_of_bounds_min && current_salinity >= min_salinity_threshold + delta_salinity)
+          salinity_out_of_bounds_min = false;
+
+      if(salinity_out_of_bounds_max && current_salinity <= max_salinity_threshold - delta_salinity)
+          salinity_out_of_bounds_max = false;
+    
 
 
-      /*if all values are in the range [min_value + delta ; max_value - delta] then publish data and set warning status off*/
-      if (!temp_out_of_bounds && !ph_out_of_bounds && !salinity_out_of_bounds) {
+      /*if all values are in the range [min_value + delta ; maxvalue] or [minvalue ; max_value - delta] then publish data and set warning status off*/
+      if (!temp_out_of_bounds && (!ph_out_of_bounds_min && !ph_out_of_bounds_max) && (!salinity_out_of_bounds_min && !salinity_out_of_bounds_max)) {
           sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
 
           cJSON *root = cJSON_CreateObject();
@@ -294,7 +313,7 @@ static void sensor_callback(void *ptr){
       }
 
         /*else if values are not in range publish only after 3 times (15 seconds in warning status)*/
-        else if(count_sensor_interval == 3){
+      else if(count_sensor_interval == 3){
               sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
 
               cJSON *root = cJSON_CreateObject();
@@ -338,11 +357,12 @@ static void sensor_callback(void *ptr){
         else{
             count_sensor_interval++;
             ctimer_reset(&tps_sensor_timer);
-        }   
-    }
+        }
+    }   
+    
     else{
       /*if are detected values out of bounds for the first time then publish data and set warning status on*/
-        if(temp_out_of_bounds || ph_out_of_bounds || salinity_out_of_bounds){
+        if(temp_out_of_bounds || ph_out_of_bounds_min || ph_out_of_bounds_max || salinity_out_of_bounds_min || salinity_out_of_bounds_max){
               sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
 
               cJSON *root = cJSON_CreateObject();
@@ -434,6 +454,8 @@ static void sensor_callback(void *ptr){
         }
     }
 }
+  
+
 
 /*---------------------------------------------------------------------------*/
 PROCESS(sensor_temp_ph_sal, "MQTT sensor_temperature_pH_sal");
@@ -458,10 +480,6 @@ static void pub_handler_temp(const char *topic, uint16_t topic_len, const uint8_
         delta_temp = delta->valuedouble;
     }
 
-    if(delta_temp < (max_temp_threshold/2 + max_ph_threshold /4) )
-      temp_error_tolerance = delta_temp/4;
-    else
-      temp_error_tolerance = 0;
 
 }
 static void pub_handler_ph(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
@@ -487,10 +505,6 @@ static void pub_handler_ph(const char *topic, uint16_t topic_len, const uint8_t 
         delta_ph = delta->valuedouble;
     }
 
-    if(delta_ph < ((max_temp_threshold - min_ph_threshold)/2 + (max_ph_threshold - min_ph_threshold)/4) )
-      ph_error_tolerance = delta_ph/4;
-    else
-      ph_error_tolerance = 0;
     
 }
 static void pub_handler_sal(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
@@ -516,10 +530,6 @@ static void pub_handler_sal(const char *topic, uint16_t topic_len, const uint8_t
         delta_salinity = delta->valuedouble;
     }
 
-    if(delta_salinity < ((max_salinity_threshold - min_salinity_threshold)/2 + (max_salinity_threshold - min_salinity_threshold)/4) )
-      salinity_error_tolerance = delta_salinity/4;
-    else
-      salinity_error_tolerance = 0;
 }
 
 /*---------------------------------------------------------------------------*/
