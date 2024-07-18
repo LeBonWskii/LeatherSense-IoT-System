@@ -28,3 +28,14 @@ CREATE TABLE telemetry (
     type VARCHAR(45),
     value FLOAT
 );
+
+-- Drop the parameters table if it exists
+DROP TABLE IF EXISTS parameter;
+
+-- Create the parameters table
+CREATE TABLE parameter (
+    type VARCHAR(45) PRIMARY KEY,
+    min FLOAT,
+    max FLOAT,
+    delta FLOAT
+);
