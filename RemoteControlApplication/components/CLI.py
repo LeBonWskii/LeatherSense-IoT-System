@@ -138,14 +138,14 @@ class CLI:
                 
     @staticmethod
     def listOfparameters(sensor):
-        if sensor == "temp":
+        if sensor == "temperature":
             print("\n+----- AVAILABLE PARAMETERS -----+\n")
             print("| 1. max                         |\n")
             print("| 2. delta                       |\n")
             print("| 3. both                        |\n")
             print("| 4. exit                        |\n")
             print("+--------------------------------+\n")
-        elif sensor == "ph":
+        elif sensor == "pH":
             print("\n+----- AVAILABLE PARAMETERS -----+\n")
             print("| 1. max                         |\n")
             print("| 2. min                         |\n")
@@ -168,7 +168,7 @@ class CLI:
         while 1:
             parameter=await asyncio.get_event_loop().run_in_executor(None, input, "PARAMETER> ")
             parameter = parameter.lower()
-            if sensor == "temp" and parameter in ["min", "both", "all"]:
+            if sensor == "temperature" and parameter in ["min", "all"]:
                 print("Temperature sensor has only two parameters: max and delta. Please enter a valid parameter.\n")
                 continue
             elif parameter in ["max", "min", "both", "delta", "all"]:
@@ -230,15 +230,16 @@ class CLI:
                         minvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MIN VALUE>: ")
                         minvalue = round(float(minvalue), 2)
 
-                    if(sensor.type== "temperature" and delta>maxvalue):
-                        print(f"Invalid input. The delta value {delta} must be less or equal than the maximum value for temperature sensor {maxvalue}.")
+                    if(sensor.type == "temperature" and delta>maxvalue):
+                        print(f"Invalid input. The delta value {delta} must be less or equal than the maximum value {maxvalue} for temperature sensor.")
                         continue
 
-                    if minvalue > maxvalue:
+                    elif (sensor.type != "temperature" and minvalue > maxvalue):
                         print(f"Invalid input. The minimum value {minvalue} must be less or equal than the maximum value {maxvalue}.")
                         continue
 
                     sensor.max = maxvalue
+
                     if(sensor.type == "temperature"):
                         sensor.delta = delta
                         self.publish_queue.put((f"params/{sensor.type}", {"max_value":maxvalue, "delta":delta}))
@@ -255,10 +256,11 @@ class CLI:
                     delta = await asyncio.get_event_loop().run_in_executor(None, input, "DELTA> ")
                     delta = round(float(delta), 2)
 
-                    if(sensor.type== "temperature" and delta>sensor.max):
-                        print(f"Invalid input. The delta value {delta} must be less or equal than the actual maximum value for temperature sensor {sensor.max}.")
+                    if(sensor.type == "temperature" and delta>sensor.max):
+                        print(f"Invalid input. The delta value {delta} must be less or equal than the actual maximum value {sensor.max} for temperature sensor.")
                         continue
-                    elif(delta>sensor.max-sensor.min):
+
+                    elif(sensor.type != "temperature" and delta>sensor.max-sensor.min):
                         print(f"Invalid input. The delta value {delta} must be less than {sensor.max-sensor.min}.")
                         continue
 
@@ -283,7 +285,7 @@ class CLI:
                         print(f"Invalid input. The minimum value {minvalue} must be less than the maximum value {maxvalue}.")
                         continue
 
-                    elif(delta>maxvalue-minvalue):
+                    if( delta>maxvalue-minvalue):
                         print(f"Invalid input. The delta value {delta} must be less than {maxvalue-minvalue}.")
                         continue
 
