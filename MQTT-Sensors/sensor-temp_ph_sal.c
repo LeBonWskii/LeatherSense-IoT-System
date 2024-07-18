@@ -49,7 +49,8 @@
 #include <stdbool.h>
 #include <math.h>
 #include <time.h>
-
+#include <stdio.h>
+#include <locale.h>
 /*---------------------------------------------------------------------------*/
 #define LOG_MODULE "sensor-temp_ph_sal"
 #ifdef MQTT_CLIENT_CONF_LOG_LEVEL
@@ -148,12 +149,12 @@ static double delta_temp = 5;
 static double delta_ph = 0.1;
 static double delta_salinity = 0.5;
 
-static double mean_temp = 20;
-static double stddev_temp = 3.13;
+static double mean_temp = 23;
+static double stddev_temp = 0.5 ;
 static double mean_ph = 2.9;
-static double stddev_ph = 0.05;
+static double stddev_ph = 0.02;
 static double mean_salinity = 2.5;
-static double stddev_salinity = 0.25;
+static double stddev_salinity = 0.10;
 
 
 /*variables for sensing values*/
@@ -170,6 +171,9 @@ static bool warning_status_active = false; //flag to check if the warning is act
 static bool start = false; //flag to check if the pickling process is started. 
 
 static char payload[BUFFER_SIZE];
+static char temp_str[BUFFER_SIZE]; 
+static char ph_str[BUFFER_SIZE];
+static char salinity_str[BUFFER_SIZE];
 
 
 static struct ctimer tps_sensor_timer; //timer for periodic sensing values of temperature, pH and salinity
@@ -213,7 +217,7 @@ static double generate_random_temp() {
 
 
 static double generate_random_ph() {
-     return generate_gaussian_noise(mean_ph, stddev_ph);
+    return generate_gaussian_noise(mean_ph, stddev_ph);
 }
 
 
@@ -241,7 +245,12 @@ static void sensor_callback(void *ptr){
     current_ph = generate_random_ph();
     current_salinity = generate_random_salinity();
 
-    LOG_INFO("Sensing finished: temperature: %f, pH: %f, salinity: %f\n", current_temp, current_ph, current_salinity);
+
+    sprintf(temp_str, "%d.%02d", (int)current_temp, (int)((current_temp - (int)current_temp) * 100 + 0.5));
+    sprintf(ph_str, "%d.%02d", (int)current_ph, (int)((current_ph - (int)current_ph) * 100 + 0.5));
+    sprintf(salinity_str, "%d.%02d", (int)current_salinity, (int)((current_salinity - (int)current_salinity) * 100 + 0.5));
+
+    LOG_INFO("Sensing finished: temperature: %s, pH: %s, salinity: %s\n", temp_str, ph_str, salinity_str);
 
     if(!warning_status_active){
       if(current_temp > max_temp_threshold)
@@ -302,13 +311,7 @@ static void sensor_callback(void *ptr){
               return;  
           }
 
-          // Convert numeric values to strings
-          char temp_str[20]; // Adjust size based on your maximum expected length
-          char ph_str[20];
-          char salinity_str[20];
-          sprintf(temp_str, "%.2f", current_temp);
-          sprintf(ph_str, "%.2f", current_ph);
-          sprintf(salinity_str, "%.2f", current_salinity);
+
 
           // Add temperature, pH, and salinity values as strings to cJSON object
           cJSON_AddStringToObject(root, "temperature", temp_str);
@@ -322,8 +325,9 @@ static void sensor_callback(void *ptr){
               return;  
           }
 
+        
           sprintf(app_buffer, "%s", json_string);
-
+          
           // Cleanup cJSON resources
           cJSON_Delete(root);
           free(json_string);
@@ -348,14 +352,6 @@ static void sensor_callback(void *ptr){
                   return;  
               }
 
-              // Convert numeric values to strings
-              char temp_str[20]; // Adjust size based on your maximum expected length
-              char ph_str[20];
-              char salinity_str[20];
-              sprintf(temp_str, "%.2f", current_temp);
-              sprintf(ph_str, "%.2f", current_ph);
-              sprintf(salinity_str, "%.2f", current_salinity);
-
               // Add temperature, pH, and salinity values as strings to cJSON object
               cJSON_AddStringToObject(root, "temperature", temp_str);
               cJSON_AddStringToObject(root, "pH", ph_str);
@@ -368,15 +364,16 @@ static void sensor_callback(void *ptr){
                   return;  
               }
 
-              sprintf(app_buffer, "%s", json_string);
-
+              
+                sprintf(app_buffer, "%s", json_string);
+                
               // Cleanup cJSON resources
               cJSON_Delete(root);
               free(json_string);
 
               // Publish JSON string
               mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
-              LOG_INFO("Publishing values on %s topic. Publishing reason: too much time spent without publishin in warning status\n", pub_topic);
+              LOG_INFO("Publishing values on %s topic. Publishing reason: too much time spent without publishing in warning status\n", pub_topic);
               count_sensor_interval = 0;
               ctimer_reset(&tps_sensor_timer);
         }
@@ -397,14 +394,6 @@ static void sensor_callback(void *ptr){
                   return;  
               }
 
-              // Convert numeric values to strings
-              char temp_str[20]; // Adjust size based on your maximum expected length
-              char ph_str[20];
-              char salinity_str[20];
-              sprintf(temp_str, "%.2f", current_temp);
-              sprintf(ph_str, "%.2f", current_ph);
-              sprintf(salinity_str, "%.2f", current_salinity);
-
               // Add temperature, pH, and salinity values as strings to cJSON object
               cJSON_AddStringToObject(root, "temperature", temp_str);
               cJSON_AddStringToObject(root, "pH", ph_str);
@@ -417,8 +406,8 @@ static void sensor_callback(void *ptr){
                   return;  
               }
 
-              sprintf(app_buffer, "%s", json_string);
-
+                sprintf(app_buffer, "%s", json_string);
+                
               // Cleanup cJSON resources
               cJSON_Delete(root);
               free(json_string);
@@ -441,14 +430,6 @@ static void sensor_callback(void *ptr){
                     return;  
                 }
 
-                // Convert numeric values to strings
-                char temp_str[20]; // Adjust size based on your maximum expected length
-                char ph_str[20];
-                char salinity_str[20];
-                sprintf(temp_str, "%.2f", current_temp);
-                sprintf(ph_str, "%.2f", current_ph);
-                sprintf(salinity_str, "%.2f", current_salinity);
-
                 // Add temperature, pH, and salinity values as strings to cJSON object
                 cJSON_AddStringToObject(root, "temperature", temp_str);
                 cJSON_AddStringToObject(root, "pH", ph_str);
@@ -460,9 +441,9 @@ static void sensor_callback(void *ptr){
                     printf("Error converting cJSON object to JSON string.\n");
                     return;  
                 }
-
+              
                 sprintf(app_buffer, "%s", json_string);
-
+                
                 // Cleanup cJSON resources
                 cJSON_Delete(root);
                 free(json_string);
@@ -514,12 +495,17 @@ static void pub_handler_temp(const char *topic, uint16_t topic_len, const uint8_
     cJSON *delta = cJSON_GetObjectItem(json, "delta");
     
     if(max){
-        LOG_INFO("Temperature maximum value threshold set from %f to %f\n", max_temp_threshold, max->valuedouble);
-        max_temp_threshold = max->valuedouble;
+LOG_INFO("Temperature maximum value threshold set from %d.%02d to %d.%02d.\n", 
+    (int)max_temp_threshold, 
+    (int)((max_temp_threshold - (int)max_temp_threshold) * 100 + 0.5), 
+    (int)max->valuedouble, 
+    (int)((max->valuedouble - (int)max->valuedouble) * 100 + 0.5));
+    
+    max_temp_threshold = max->valuedouble;
     }
 
     if(delta){
-        LOG_INFO("Temperature delta value set from %f to %f\n", delta_temp, delta->valuedouble);
+        LOG_INFO("Temperature delta value set from %d.%02d to %d.%02d\n", (int)delta_temp, (int)((delta_temp - (int)delta_temp) * 100 + 0.5), (int)delta->valuedouble, (int)((delta->valuedouble - (int)delta->valuedouble) * 100 + 0.5));
         delta_temp = delta->valuedouble;
     }
 
@@ -534,17 +520,17 @@ static void pub_handler_ph(const char *topic, uint16_t topic_len, const uint8_t 
     cJSON *delta = cJSON_GetObjectItem(json, "delta");
 
     if(min){
-        LOG_INFO("pH minimum value threshold set from %f to %f\n", min_ph_threshold, min->valuedouble);
+        LOG_INFO("pH minimum value threshold set from %d.%02d to %d.%02d\n", (int) min_ph_threshold, (int)((min_ph_threshold - (int)min_ph_threshold) * 100 + 0.5), (int) min->valuedouble, (int)((min->valuedouble - (int)min->valuedouble) * 100 + 0.5));
         min_ph_threshold = min->valuedouble;
     }
 
     if(max){
-        LOG_INFO("pH maximum value threshold set from %f to %f\n", max_ph_threshold, max->valuedouble);
+        LOG_INFO("pH maximum value threshold set from %d.%02d to %d.%02d\n", (int) max_ph_threshold, (int)((max_ph_threshold - (int)max_ph_threshold) * 100 + 0.5), (int) max->valuedouble, (int)((max->valuedouble - (int)max->valuedouble) * 100 + 0.5));
         max_ph_threshold = max->valuedouble;
     }
 
     if(delta){
-        LOG_INFO("pH delta value set from %f to %f\n", delta_ph, delta->valuedouble);
+        LOG_INFO("pH delta value set from %d.%02d to %d.%02d\n", (int)delta_ph, (int)((delta_ph - (int)delta_ph) * 100 + 0.5), (int)delta->valuedouble, (int)((delta->valuedouble - (int)delta->valuedouble) * 100 + 0.5));
         delta_ph = delta->valuedouble;
     }
 
@@ -559,17 +545,17 @@ static void pub_handler_sal(const char *topic, uint16_t topic_len, const uint8_t
     cJSON *delta = cJSON_GetObjectItem(json, "delta");
 
     if(min){
-        LOG_INFO("Salinity minimum value threshold set from %f to %f\n", min_salinity_threshold, min->valuedouble);
+        LOG_INFO("Salinity minimum value threshold set from %d.%02d to %d.%02d\n", (int) min_salinity_threshold, (int)((min_salinity_threshold - (int)min_salinity_threshold) * 100 + 0.5), (int) min->valuedouble, (int)((min->valuedouble - (int)min->valuedouble) * 100 + 0.5));
         min_salinity_threshold = min->valuedouble;
     }
 
     if(max){
-        LOG_INFO("Salinity maximum value threshold set from %f to %f\n", max_salinity_threshold, max->valuedouble);
+        LOG_INFO("Salinity maximum value threshold set from %d.%02d to %d.%02d\n", (int) max_salinity_threshold, (int)((max_salinity_threshold - (int)max_salinity_threshold) * 100 + 0.5), (int) max->valuedouble, (int)((max->valuedouble - (int)max->valuedouble) * 100 + 0.5));
         max_salinity_threshold = max->valuedouble;
     }
 
     if(delta){
-        LOG_INFO("Salinity delta value set from %f to %f\n", delta_salinity, delta->valuedouble);
+        LOG_INFO("Salinity delta value set from %d.%02d to %d.%02d\n", (int)delta_salinity, (int)((delta_salinity - (int)delta_salinity) * 100 + 0.5), (int)delta->valuedouble, (int)((delta->valuedouble - (int)delta->valuedouble) * 100 + 0.5));
         delta_salinity = delta->valuedouble;
     }
 
@@ -582,6 +568,7 @@ static void mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data
     LOG_INFO("Application has a MQTT connection\n");
     state = STATE_CONNECTED;
     current_topic_index = 0;
+    srand(time(NULL));
     break;
   }
   case MQTT_EVENT_DISCONNECTED: {
@@ -753,7 +740,7 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
             start=true;
             LOG_INFO("Sensor temp_ph_sal started successfully\n");
         }
-        srand(time(NULL));
+        
       } 
       else if (state == STATE_STOP){
         ctimer_stop(&tps_sensor_timer);
@@ -785,29 +772,29 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
                 etimer_set(&button_timer, BUTTON_INTERVAL);
                 button_press_count++;
             }
-            else if(button_press_count <7)
+            else if(button_press_count <6)
                 button_press_count++;
     }
 }
     else if(ev == PROCESS_EVENT_TIMER && data == &button_timer){
         switch(button_press_count){
             case 1:
-                mean_temp+=stddev_temp;
+                mean_temp+=(4 * stddev_temp);
                 break;
             case 2:
-                mean_ph+=stddev_ph;
+                mean_ph+=(3 * stddev_ph);
                 break;
             case 3:
-                mean_salinity+=stddev_salinity;
+                mean_salinity+=(3 * stddev_salinity);
                 break;
             case 4:
-                mean_temp-=stddev_temp;
+                mean_temp-=(4 * stddev_temp);
                 break;
             case 5:
-                mean_ph-=stddev_ph;
+                mean_ph-=(3 * stddev_ph);
                 break;
             case 6:
-                mean_salinity-=stddev_salinity;
+                mean_salinity-=(3 * stddev_salinity);
                 break;
         }
         button_press_count = 0;
