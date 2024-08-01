@@ -402,6 +402,9 @@ class CLI:
             while not stop_event.is_set():
                 try:
                     topic, data = publish_queue.get(timeout=1) #obtain data from queue, timeout needed to check if stop_event is set
+                    for key in data:
+                        if isinstance(data[key], float):
+                            data[key] = str(data[key]) #convert float values to string for correct cJSON parse
                     payload = json.dumps(data) #convert data to JSON format
                     client.publish(topic, payload) #publish data in the topic
                 except Empty:

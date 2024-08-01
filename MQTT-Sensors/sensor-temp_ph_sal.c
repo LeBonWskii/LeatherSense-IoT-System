@@ -472,7 +472,7 @@ AUTOSTART_PROCESSES(&sensor_temp_ph_sal);
 /*Handler to manage the setting of parameters in case of publication on the topic to which the sensor is subscribed*/
 static void pub_handler_start(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
     memcpy(payload, chunk, chunk_len);
-    payload[chunk_len] = '\0';
+    payload[chunk_len + 1] = '\0';
     cJSON *json = cJSON_Parse(payload);
     cJSON *str = cJSON_GetObjectItem(json, "value");
     if(str){
@@ -488,54 +488,101 @@ static void pub_handler_start(const char *topic, uint16_t topic_len, const uint8
 }
 
 static void pub_handler_temp(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
+
     memcpy(payload, chunk, chunk_len);
-    payload[chunk_len] = '\0';
+    payload[chunk_len + 1] = '\0';
     cJSON *json = cJSON_Parse(payload);
     cJSON *max = cJSON_GetObjectItem(json, "max_value");
     cJSON *delta = cJSON_GetObjectItem(json, "delta");
-    
+    setlocale(LC_ALL, "C");
+
     if(max){
-LOG_INFO("Temperature maximum value threshold set from %d.%02d to %d.%02d.\n", 
-    (int)max_temp_threshold, 
-    (int)((max_temp_threshold - (int)max_temp_threshold) * 100 + 0.5), 
-    (int)max->valuedouble, 
-    (int)((max->valuedouble - (int)max->valuedouble) * 100 + 0.5));
+
+        LOG_INFO("Temperature maximum value threshold set from %d.%02d to %d.%02d.\n", 
+
+        (int)max_temp_threshold, 
+        (int)((max_temp_threshold - (int)max_temp_threshold) * 100 + 0.5), 
+        (int) (strtod(max->valuestring, NULL)), 
+        (int)((strtod(max->valuestring, NULL) - (int)(strtod(max->valuestring, NULL))) * 100 + 0.5));
+
     
-    max_temp_threshold = max->valuedouble;
+
+        max_temp_threshold = round(strtod(max->valuestring, NULL) * 100.0) / 100.0;
+
+   
+
     }
 
     if(delta){
-        LOG_INFO("Temperature delta value set from %d.%02d to %d.%02d\n", (int)delta_temp, (int)((delta_temp - (int)delta_temp) * 100 + 0.5), (int)delta->valuedouble, (int)((delta->valuedouble - (int)delta->valuedouble) * 100 + 0.5));
-        delta_temp = delta->valuedouble;
+
+        LOG_INFO("Temperature delta value set from %d.%02d to %d.%02d\n", 
+
+        (int)delta_temp, 
+        (int)((delta_temp - (int)delta_temp) * 100 + 0.5), 
+        (int)strtod(delta->valuestring, NULL), 
+        (int)((strtod(delta->valuestring, NULL) - (int)strtod(delta->valuestring, NULL)) * 100 + 0.5));
+
+        delta_temp = round(strtod(delta->valuestring, NULL) * 100.0) / 100.0;
+
+  
+
     }
 
 
 }
+
 static void pub_handler_ph(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
+
     memcpy(payload, chunk, chunk_len);
     payload[chunk_len] = '\0';
     cJSON *json = cJSON_Parse(payload);
     cJSON *min = cJSON_GetObjectItem(json, "min_value");
     cJSON *max = cJSON_GetObjectItem(json, "max_value");
     cJSON *delta = cJSON_GetObjectItem(json, "delta");
+    setlocale(LC_ALL, "C");
 
     if(min){
-        LOG_INFO("pH minimum value threshold set from %d.%02d to %d.%02d\n", (int) min_ph_threshold, (int)((min_ph_threshold - (int)min_ph_threshold) * 100 + 0.5), (int) min->valuedouble, (int)((min->valuedouble - (int)min->valuedouble) * 100 + 0.5));
-        min_ph_threshold = min->valuedouble;
+
+        LOG_INFO("pH minimum value threshold set from %d.%02d to %d.%02d\n", 
+
+        (int) min_ph_threshold, 
+        (int)((min_ph_threshold - (int)min_ph_threshold) * 100 + 0.5), 
+        (int) strtod(min->valuestring, NULL), 
+        (int)((strtod(min->valuestring, NULL) - (int)strtod(min->valuestring, NULL)) * 100 + 0.5));
+
+        min_ph_threshold = round(strtod(min->valuestring, NULL) * 100.0) / 100.0;
+
     }
 
     if(max){
-        LOG_INFO("pH maximum value threshold set from %d.%02d to %d.%02d\n", (int) max_ph_threshold, (int)((max_ph_threshold - (int)max_ph_threshold) * 100 + 0.5), (int) max->valuedouble, (int)((max->valuedouble - (int)max->valuedouble) * 100 + 0.5));
-        max_ph_threshold = max->valuedouble;
+
+        LOG_INFO("pH maximum value threshold set from %d.%02d to %d.%02d\n", 
+
+        (int) max_ph_threshold, 
+        (int)((max_ph_threshold - (int)max_ph_threshold) * 100 + 0.5), 
+        (int) strtod(max->valuestring, NULL), 
+        (int)((strtod(max->valuestring, NULL) - (int)strtod(max->valuestring, NULL)) * 100 + 0.5));
+
+        max_ph_threshold = round(strtod(max->valuestring, NULL) * 100.0) / 100.0;
+
     }
 
     if(delta){
-        LOG_INFO("pH delta value set from %d.%02d to %d.%02d\n", (int)delta_ph, (int)((delta_ph - (int)delta_ph) * 100 + 0.5), (int)delta->valuedouble, (int)((delta->valuedouble - (int)delta->valuedouble) * 100 + 0.5));
-        delta_ph = delta->valuedouble;
+
+        LOG_INFO("pH delta value set from %d.%02d to %d.%02d\n", 
+
+        (int)delta_ph, 
+        (int)((delta_ph - (int)delta_ph) * 100 + 0.5), 
+        (int)strtod(delta->valuestring, NULL), 
+        (int)((strtod(delta->valuestring, NULL) - (int)strtod(delta->valuestring, NULL)) * 100 + 0.5));
+
+        delta_ph = round(strtod(delta->valuestring, NULL) * 100.0) / 100.0;
+
     }
 
-    
+
 }
+
 static void pub_handler_sal(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len){
     memcpy(payload, chunk, chunk_len);
     payload[chunk_len] = '\0';
@@ -543,20 +590,44 @@ static void pub_handler_sal(const char *topic, uint16_t topic_len, const uint8_t
     cJSON *min = cJSON_GetObjectItem(json, "min_value");
     cJSON *max = cJSON_GetObjectItem(json, "max_value");
     cJSON *delta = cJSON_GetObjectItem(json, "delta");
+    setlocale(LC_ALL, "C");
 
     if(min){
-        LOG_INFO("Salinity minimum value threshold set from %d.%02d to %d.%02d\n", (int) min_salinity_threshold, (int)((min_salinity_threshold - (int)min_salinity_threshold) * 100 + 0.5), (int) min->valuedouble, (int)((min->valuedouble - (int)min->valuedouble) * 100 + 0.5));
-        min_salinity_threshold = min->valuedouble;
+
+        LOG_INFO("Salinity minimum value threshold set from %d.%02d to %d.%02d\n", 
+
+        (int) min_salinity_threshold, 
+        (int)((min_salinity_threshold - (int)min_salinity_threshold) * 100 + 0.5), 
+        (int) strtod(min->valuestring, NULL), 
+        (int)((strtod(min->valuestring, NULL) - (int)strtod(min->valuestring, NULL)) * 100 + 0.5));
+
+        min_salinity_threshold = round(strtod(min->valuestring, NULL) * 100.0) / 100.0;
+
     }
 
     if(max){
-        LOG_INFO("Salinity maximum value threshold set from %d.%02d to %d.%02d\n", (int) max_salinity_threshold, (int)((max_salinity_threshold - (int)max_salinity_threshold) * 100 + 0.5), (int) max->valuedouble, (int)((max->valuedouble - (int)max->valuedouble) * 100 + 0.5));
-        max_salinity_threshold = max->valuedouble;
+
+        LOG_INFO("Salinity maximum value threshold set from %d.%02d to %d.%02d\n", 
+
+        (int) max_salinity_threshold, 
+        (int)((max_salinity_threshold - (int)max_salinity_threshold) * 100 + 0.5), 
+        (int) strtod(max->valuestring, NULL), 
+        (int)((strtod(max->valuestring, NULL) - (int)strtod(max->valuestring, NULL)) * 100 + 0.5));
+
+        max_salinity_threshold = round(strtod(max->valuestring, NULL) * 100.0) / 100.0;
+
     }
 
     if(delta){
-        LOG_INFO("Salinity delta value set from %d.%02d to %d.%02d\n", (int)delta_salinity, (int)((delta_salinity - (int)delta_salinity) * 100 + 0.5), (int)delta->valuedouble, (int)((delta->valuedouble - (int)delta->valuedouble) * 100 + 0.5));
-        delta_salinity = delta->valuedouble;
+
+        LOG_INFO("Salinity delta value set from %d.%02d to %d.%02d\n", 
+        (int)delta_salinity, 
+        (int)((delta_salinity - (int)delta_salinity) * 100 + 0.5), 
+        (int)strtod(delta->valuestring, NULL), 
+        (int)((strtod(delta->valuestring, NULL) - (int)strtod(delta->valuestring, NULL)) * 100 + 0.5));
+
+        delta_salinity = round(strtod(delta->valuestring, NULL) * 100.0) / 100.0;
+
     }
 
 }
