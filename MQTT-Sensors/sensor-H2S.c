@@ -48,7 +48,7 @@
 #include <strings.h>
 #include <stdbool.h>
 /*---------------------------------------------------------------------------*/
-#define LOG_MODULE "sensor_S02"
+#define LOG_MODULE "sensor-H2S"
 #ifdef MQTT_CLIENT_CONF_LOG_LEVEL
 #define LOG_LEVEL MQTT_CLIENT_CONF_LOG_LEVEL
 #else
@@ -125,14 +125,14 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 static int current_h2s = 0;
 static int generated_value = 0;
 
-static struct ctimer h2s_sensor_timer; //timer for periodic sensing values of temperature, pH and salinity
+static struct ctimer h2s_sensor_timer; //timer for periodic sensing values of H2S
 static bool first_time = true; //flag to check if it is the first time the sensor is activated
 static bool warning_status_active = false; //flag to check if the warning status is active
 static int count_sensor_interval = 0; //counter for the number of times the sensor interval has been reached
 static struct etimer reconnection_timer; //timer for reconnection to the broker
 static bool start = false; //flag to check if the sensor has started
 
-#define SENSOR_INTERVAL (CLOCK_SECOND * 8) //interval for sensing values of temperature, pH and salinity
+#define SENSOR_INTERVAL (CLOCK_SECOND * 8) //interval for sensing values of H2S
 #define MONITORING_INTERVAL (CLOCK_SECOND * 4) //interval for monitoring the is warning status
 /*---------------------------------------------------------------------------*/
 /*Utility function for generate random sensing values*/
@@ -143,7 +143,7 @@ static int generate_h2s(){
 
 /*---------------------------------------------------------------------------*/
 static void sensor_callback(void *ptr){
-    // Generate random values for temperature, pH and salinity
+    // Generate random values for H2S
     current_h2s = generate_h2s();
     if(current_h2s)
         LOG_INFO("*WARNING* H2S DETECTED\n");
@@ -160,8 +160,8 @@ static void sensor_callback(void *ptr){
             count_sensor_interval = 0;
             ctimer_set(&h2s_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
         }
-        /*else if values are not in range publish only after 3 times (15 seconds in warning status)*/
-        else if(count_sensor_interval == 3){
+        /*else if values are not in range publish only after 3 times (12 seconds in warning status)*/
+        else if(count_sensor_interval == 2){
             sprintf(pub_topic, "%s", "sensor/h2s"); //publish on the topic sensor/h2s
             sprintf(app_buffer, "{ \"h2s\": %d }", current_h2s);
             mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
@@ -186,7 +186,7 @@ static void sensor_callback(void *ptr){
             ctimer_set(&h2s_sensor_timer, MONITORING_INTERVAL, sensor_callback, NULL);
         }
         else{
-          /*else all is ok publish only after 3 times (30 seconds in normal status)*/
+          /*else all is ok publish only after 4 times (32 seconds in normal status)*/
             if(count_sensor_interval == 3){
                 sprintf(pub_topic, "%s", "sensor/h2s"); //publish on the topic sensor/h2s
                 sprintf(app_buffer, "{ \"h2s\": %d }", current_h2s);
