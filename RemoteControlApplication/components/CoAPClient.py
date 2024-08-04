@@ -12,7 +12,6 @@ class CoAPClient:
 
     async def run(self):
         context = await aiocoap.Context.create_client_context()
-
         uri = f"coap://{self.resource_dao.get_ip()}/{self.resource_dao.get_resource()}"
         payload_dict = {"action": self.payload}
 

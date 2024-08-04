@@ -67,7 +67,7 @@ extern coap_resource_t res_fans;
 /*              Thread configuration              */
 /* ---------------------------------------------- */
 
-// Timer
+// Timers
 static struct etimer sleep_timer;
 
 // Process declaration
@@ -85,6 +85,9 @@ PROCESS_THREAD(actuator_fans, ev, data){
 
     PROCESS_BEGIN();
 
+	// Turn on the red and blue LEDS solid while not registered
+	leds_on(LEDS_RED);
+	leds_on(LEDS_BLUE);
 
 	/* -------------- Registration --------------- */
 
@@ -107,7 +110,13 @@ PROCESS_THREAD(actuator_fans, ev, data){
 			max_registration_retry = MAX_REGISTRATION_RETRY;
 		}
 	}
-    
+
+    // Turn on the green LED solid once registered
+    if(max_registration_retry == 0) {
+		leds_off(LEDS_RED);
+		leds_off(LEDS_BLUE);
+        leds_on(LEDS_GREEN);
+    }    
 
 	/* ----------- Resource activation ----------- */
     coap_activate_resource(&res_fans, "actuator_fans");

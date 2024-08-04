@@ -1,12 +1,12 @@
 import sys
+import os
 import json
 from coapthon.resources.resource import Resource
 from coapthon.server.coap import CoAP
 from coapthon.messages.response import Response
 from coapthon.messages.request import Request
 from coapthon import defines
-from .SystemActuatorData import SystemActuatorData as SAD
-sys.path.append("..")
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from database.models.database import Database
     
 ''' This module contains the Registration class which is a CoAP resource that handles GET requests for actuator registration. '''
@@ -39,7 +39,6 @@ class Registration(Resource):
         # Initialize the database
         self.database = Database()
         self.connection = self.database.connect()
-        self.actuators = SAD.actuators
     
     def render_POST(self, request):
         '''
@@ -61,7 +60,7 @@ class Registration(Resource):
         
         # Insert actuator into the database
         if "name" in payload and "status" in payload:
-            self.code = self.insert_actuator(payload["name"], request.source)
+            self.code = self.insert_actuator(payload["name"], request.source, payload["status"])
         else:
             print("Invalid payload")
             self.code = defines.Codes.BAD_REQUEST.number
@@ -69,14 +68,14 @@ class Registration(Resource):
         self.destination = request.source
         return self
     
-    def insert_actuator(self, type, ip_port):
+    def insert_actuator(self, type, ip_port, status):
         '''
         Insert a new actuator into the database
         :param type: Type of sensor
         :param ip_port: IP address and port number of the sensor
         :return: None
         '''
-        print(f"Inserting {type} actuator at {ip_port} into the database (initial status: off)")
+        print(f"Inserting {type} actuator at {ip_port} into the database (initial status: {status})")
 
         # Insert node info into Actuator table if not already present
         try:
@@ -90,7 +89,7 @@ class Registration(Resource):
                 VALUES (%s, %s, %s)
                 ON DUPLICATE KEY UPDATE  ip_address = %s, type = %s, status = %s;
                 """
-                cursor.execute(insert_node_query, (ip_port[0], type, "off", ip_port[0], type, "off"))   # Starting status is off
+                cursor.execute(insert_node_query, (ip_port[0], type, status, ip_port[0], type, status))   # Starting status is off
                 self.connection.commit()
 
                 # Check if the actuator was inserted successfully
@@ -107,7 +106,6 @@ class Registration(Resource):
             # Return internal server error if database connection is lost
             else:
                 print("Database connection lost")
-                cursor.close()
                 return defines.Codes.INTERNAL_SERVER_ERROR.number
         
         # Handle database errors

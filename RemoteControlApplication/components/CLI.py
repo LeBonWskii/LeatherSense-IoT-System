@@ -113,11 +113,11 @@ class CLI:
 
     @staticmethod
     def listOfsensors():
-        print("\n+----- AVAILABLE SENSORS -----+\n")
-        print("| 1. temperature              |\n")
-        print("| 2. pH                       |\n")
-        print("| 3. salinity                 |\n")
-        print("| 4. exit                     |\n")
+        print("\n+----- AVAILABLE SENSORS -----+")
+        print("| 1. temperature              |")
+        print("| 2. pH                       |")
+        print("| 3. salinity                 |")
+        print("| 4. exit                     |")
         print("+-----------------------------+\n")
         
     async def getsensorvalues(self):
@@ -139,29 +139,29 @@ class CLI:
     @staticmethod
     def listOfparameters(sensor):
         if sensor == "temperature":
-            print("\n+----- AVAILABLE PARAMETERS -----+\n")
-            print("| 1. max                         |\n")
-            print("| 2. delta                       |\n")
-            print("| 3. both                        |\n")
-            print("| 4. exit                        |\n")
+            print("\n+----- AVAILABLE PARAMETERS -----+")
+            print("| 1. max                         |")
+            print("| 2. delta                       |")
+            print("| 3. both                        |")
+            print("| 4. exit                        |")
             print("+--------------------------------+\n")
         elif sensor == "pH":
-            print("\n+----- AVAILABLE PARAMETERS -----+\n")
-            print("| 1. max                         |\n")
-            print("| 2. min                         |\n")
-            print("| 3. both                        |\n")
-            print("| 4. delta                       |\n")
-            print("| 5. all                         |\n")
-            print("| 6. exit                        |\n")
+            print("\n+----- AVAILABLE PARAMETERS -----+")
+            print("| 1. max                         |")
+            print("| 2. min                         |")
+            print("| 3. both                        |")
+            print("| 4. delta                       |")
+            print("| 5. all                         |")
+            print("| 6. exit                        |")
             print("+--------------------------------+\n")
         elif sensor == "salinity":
-            print("\n+----- AVAILABLE PARAMETERS -----+\n")
-            print("| 1. max                         |\n")
-            print("| 2. min                         |\n")
-            print("| 3. both                        |\n")
-            print("| 4. delta                       |\n")
-            print("| 5. all                         |\n")
-            print("| 6. exit                        |\n")
+            print("\n+----- AVAILABLE PARAMETERS -----+")
+            print("| 1. max                         |")
+            print("| 2. min                         |")
+            print("| 3. both                        |")
+            print("| 4. delta                       |")
+            print("| 5. all                         |")
+            print("| 6. exit                        |")
             print("+--------------------------------+\n")
     
     async def getparameters(self,sensor):
@@ -383,14 +383,14 @@ class CLI:
 
     @staticmethod
     def help():
-        print("\n+--------------------- COMMAND EXPLANATION ---------------------+")
-        print("| 1. configure - Configure ranges for actuator activation.      |")
-        print("| 2. settings  - Check the settled ranges.                      |")
-        print("| 3. monitor   - Monitor the sensor values.                     |")
-        print("| 4. help      - Display the description of available commands. |")
-        print("| 5. exit      - Exit the CLI application.                      |")
-        print("+---------------------------------------------------------------+\n")
-
+        print("\n+------------------------- COMMAND EXPLANATION -------------------------+")
+        print("| 1. configure           - Configure ranges for actuator activation.      |")
+        print("| 2. settings            - Check the settled ranges.                      |")
+        print("| 3. start/stop pickling - Manage the pickling process.                   |")
+        print("| 4. monitor             - Monitor the sensor values and actuator status. |")
+        print("| 5. help                - Display the description of available commands. |")
+        print("| 6. exit                - Exit the CLI application.                      |")
+        print("+-------------------------------------------------------------------------+\n")
 
     # Configurazione del client MQTT
     @staticmethod

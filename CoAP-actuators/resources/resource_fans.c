@@ -105,7 +105,7 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
 
         //  FANS_EXHAUST -> YELLOW led
         else if((strncmp(action, getFansStatus(FANS_EXHAUST), len) == 0)){
-            if(fans_status != FANS_EXHAUST && fans_status != FANS_BOTH){
+            if(fans_status != FANS_EXHAUST){
                 fans_status = FANS_EXHAUST;
                 leds_off(LEDS_BLUE);
                 leds_on(LEDS_GREEN);
@@ -120,7 +120,7 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
 
         // FANS_COOLING -> BLUE led
         else if((strncmp(action, getFansStatus(FANS_COOLING), len) == 0)){
-            if(fans_status != FANS_COOLING && fans_status != FANS_BOTH){
+            if(fans_status != FANS_COOLING){
                 fans_status = FANS_COOLING;
                 leds_off(LEDS_GREEN);
                 leds_off(LEDS_RED);

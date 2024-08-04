@@ -1,3 +1,4 @@
+import sys
 from coapthon.server.coap import CoAP
 from mysql.connector import Error
 from resources.Registration import Registration

@@ -1,7 +1,8 @@
 import sys
+import os
 import asyncio
 from mysql.connector import Error
-sys.path.append("..")
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from database.models.database import Database
 
 class ResourceDAO:

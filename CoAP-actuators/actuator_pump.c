@@ -67,7 +67,7 @@ extern coap_resource_t res_pump;
 /*              Thread configuration              */
 /* ---------------------------------------------- */
 
-// Timer
+// Timers
 static struct etimer sleep_timer;
 
 // Process declaration
@@ -85,12 +85,15 @@ PROCESS_THREAD(actuator_pump, ev, data){
 
     PROCESS_BEGIN();
 
+	// Turn on the red and blue LEDS solid while not registered
+	leds_on(LEDS_RED);
+	leds_on(LEDS_BLUE);
 
 	/* -------------- Registration --------------- */
 
 	// Registration is tried until is successful
 	while(max_registration_retry!=0){
-		
+
 		// Prepare registration request
 		coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
 		coap_init_message(request, COAP_TYPE_CON,COAP_POST, 0);
@@ -107,8 +110,14 @@ PROCESS_THREAD(actuator_pump, ev, data){
 			max_registration_retry = MAX_REGISTRATION_RETRY;
 		}
 	}
-    
 
+    // Turn on the green LED solid once registered
+    if(max_registration_retry == 0) {
+		leds_off(LEDS_RED);
+		leds_off(LEDS_BLUE);
+        leds_on(LEDS_GREEN);
+    }    
+	
 	/* ----------- Resource activation ----------- */
     coap_activate_resource(&res_pump, "actuator_pump");
 
