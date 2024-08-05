@@ -36,7 +36,7 @@ def on_connect_h2s(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8", "ignore"))
 
-    current_time = datetime.datetime.now()
+    current_time = datetime.datetime.utcnow()
 
     if msg.topic == "sensor/temp_pH_sal":
             temperature = float(data["temperature"].replace(',', '.'))
