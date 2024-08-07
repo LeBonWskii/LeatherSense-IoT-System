@@ -428,7 +428,7 @@
               },
               {
                 "id": "unit",
-                "value": "none"
+                "value": "° Baumé"
               }
             ]
           },
@@ -912,7 +912,7 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "° Baumé"
         },
         "overrides": [
           {
@@ -1349,13 +1349,13 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "LeatherSense",
   "uid": "fdrqrvq3265mod",
-  "version": 16,
+  "version": 17,
   "weekStart": ""
 }

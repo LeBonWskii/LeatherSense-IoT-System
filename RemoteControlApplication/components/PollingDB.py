@@ -96,22 +96,36 @@ class PollingDB:
             "locker": await ResourceDAO.retrieve_information("locker")
         }
         
-        # Turn off all actuators except the locker
-        if resource_status["fans"] is not None:
-            await CoAPClient(resource_status["fans"], "off").run()
-        if resource_status["pump"] is not None:
+        # Turn off pump and alarm
+        if resource_status["pump"] is not None and resource_status["pump"].status != "off":
             await CoAPClient(resource_status["pump"], "off").run()
-        if resource_status["alarm"] is not None:
+            print("Water pump turned off.")
+        if resource_status["alarm"] is not None and resource_status["alarm"].status != "off":
             await CoAPClient(resource_status["alarm"], "off").run()
-        
+            print("Alarm turned off.")
+
         # Turn off the locker if it is connected only if H2S is no more detected, otherwise keep it on
         if resource_status["locker"] is not None:
             if self.types["H2S"].value is not None and int(self.types["H2S"].value) == 1:
                 print("H2S still detected, waiting for it to be no more detected before turning off locker...")
+                # Mantaining air fans active to drain the gas                
+                if resource_status["fans"] is not None:
+                    print("Draining H2S using air fans...")
+                    if resource_status["pump"].status != "exhaust":
+                        await CoAPClient(resource_status["fans"], "exhaust").run()
+                # Periodically checking H2S presence
                 while self.types["H2S"].value is not None and int(self.types["H2S"].value) == 1:
                     await asyncio.sleep(1)
                 print("H2S no more detected, turning off locker!")
             await CoAPClient(resource_status["locker"], "off").run()
+            print("Locker turned off.")
+            if resource_status["fans"] is not None:
+                await CoAPClient(resource_status["fans"], "off").run()
+                print("Air fans turned off.")
+        else:
+            if resource_status["fans"] is not None and resource_status["pump"].status != "off":
+                await CoAPClient(resource_status["fans"], "off").run()
+                print("Air fans turned off.")
 
         self.initialize_sensors()
 
