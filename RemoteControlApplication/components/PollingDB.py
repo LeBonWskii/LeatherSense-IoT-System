@@ -111,7 +111,7 @@ class PollingDB:
                 # Mantaining air fans active to drain the gas                
                 if resource_status["fans"] is not None:
                     print("Draining H2S using air fans...")
-                    if resource_status["pump"].status != "exhaust":
+                    if resource_status["fans"].status != "exhaust":
                         await CoAPClient(resource_status["fans"], "exhaust").run()
                 # Periodically checking H2S presence
                 while self.types["H2S"].value is not None and int(self.types["H2S"].value) == 1:
@@ -123,7 +123,7 @@ class PollingDB:
                 await CoAPClient(resource_status["fans"], "off").run()
                 print("Air fans turned off.")
         else:
-            if resource_status["fans"] is not None and resource_status["pump"].status != "off":
+            if resource_status["fans"] is not None and resource_status["fans"].status != "off":
                 await CoAPClient(resource_status["fans"], "off").run()
                 print("Air fans turned off.")
 

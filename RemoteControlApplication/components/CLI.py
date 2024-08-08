@@ -350,7 +350,7 @@ class CLI:
     
     async def monitor(self):
         print("Enter the frequency of monitoring in seconds:")
-        frequency = await asyncio.get_event_loop().run_in_executor(None, input, "FREQUENCY>: ")
+        frequency = await asyncio.get_event_loop().run_in_executor(None, input, "FREQUENCY> ")
         if not frequency.isdigit():
             frequency = 5
         else:
@@ -383,7 +383,7 @@ class CLI:
 
     @staticmethod
     def help():
-        print("\n+------------------------- COMMAND EXPLANATION -------------------------+")
+        print("\n+------------------------- COMMAND EXPLANATION ---------------------------+")
         print("| 1. configure           - Configure ranges for actuator activation.      |")
         print("| 2. settings            - Check the settled ranges.                      |")
         print("| 3. start/stop pickling - Manage the pickling process.                   |")
