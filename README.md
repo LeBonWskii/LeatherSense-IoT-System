@@ -4,6 +4,10 @@
 
 **LeatherSense** is an IoT-based monitoring and control system designed to optimize the pickling phase of the leather tanning process. The system monitors key environmental parameters such as pH, salinity, temperature, and hydrogen sulfide (H2S) levels to ensure high product quality, operational efficiency, and worker safety.
 
+Here an example of a system display while it is running:
+![grafana status](grafana/Status.png)
+![grafana trends](grafana/Trends.png)
+
 ## Features
 
 - **Real-time Monitoring**: Continuous tracking of critical water characteristics (pH, salinity, temperature) and toxic gas levels (H2S).
@@ -32,15 +36,15 @@ The system is based on the **Contiki-NG** operating system, with sensors and act
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/leathersense.git
-   cd leathersense
+   git clone https://github.com/LeBonWskii/IOT-Project.git
+   cd IOT-Project
    ```
 
 2. **Move Repository to Contiki-NG Examples**:
    - Since the project relies on Contiki-NG dependencies, it should be placed within the `contiki-ng/examples` directory:
    ```bash
-   mv leathersense /path/to/contiki-ng/examples/
-   cd /path/to/contiki-ng/examples/leathersense
+   mv IOT-Project /path/to/contiki-ng/examples/
+   cd /path/to/contiki-ng/examples/IOT-Project
    ```
 
 3. **Compile and Flash Code to nRF52840 Dongles**:
@@ -49,7 +53,7 @@ The system is based on the **Contiki-NG** operating system, with sensors and act
      ```bash
      make TARGET=nrf52840 BOARD=dongle <program-name>.dfu-upload PORT=/dev/ttyACMx
      ```
-     - Replace `<program-name>` with the specific program you are compiling (e.g., `hello-world`). The `PORT` should be set according to the dongle's connection, where `x` corresponds to the number of the connected dongle (e.g., `ACM0` for the first dongle, `ACM1` for the second, etc.).
+     - Replace `<program-name>` with the specific program you are compiling (**sensors, actuators and border router codes**). The `PORT` should be set according to the dongle's connection, where `x` corresponds to the number of the connected dongle (e.g., `ACM0` for the first dongle, `ACM1` for the second, etc.).
      - **Note**: Running the command without the `.dfu-upload` part will only compile the code:
      ```bash
      make TARGET=nrf52840 BOARD=dongle <program-name>
@@ -79,7 +83,7 @@ The system is based on the **Contiki-NG** operating system, with sensors and act
      - `help`: Displays the usage instructions for the script.
 
 ### Usage
-
+In the CLI interface:
 - **Start the Pickling Process**:
    ```bash
    start_pickling
