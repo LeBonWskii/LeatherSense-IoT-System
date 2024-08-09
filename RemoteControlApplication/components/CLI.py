@@ -406,7 +406,7 @@ class CLI:
                         if isinstance(data[key], float):
                             data[key] = str(data[key]) #convert float values to string for correct cJSON parse
                     payload = json.dumps(data) #convert data to JSON format
-                    client.publish(topic, payload) #publish data in the topic
+                    client.publish(topic, payload, retain = True) #publish data in the topic
                 except Empty:
                     continue
         finally:
