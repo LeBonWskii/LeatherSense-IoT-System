@@ -85,10 +85,10 @@ class CLI:
             self.help()
         elif command == "exit":
             print("Exiting...")
-            self.stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
-            self.publisher_thread.join()  # Attendi che il thread MQTT termini.
             if self.pickling_starting_time is not None:
                 await self.stop_pickling()
+            self.stop_event.set()  # Imposta l'evento per fermare il thread MQTT.
+            self.publisher_thread.join()  # Attendi che il thread MQTT termini.
             raise ShutDownRequest()       
             
         else:
