@@ -123,7 +123,6 @@ class CLI:
     async def getsensorvalues(self):
         while 1:
             sensor=await asyncio.get_event_loop().run_in_executor(None, input, "SENSOR> ")
-            sensor = sensor
 
             if sensor in self.sensor_map.keys():
                 self.listOfparameters(sensor)
@@ -147,8 +146,8 @@ class CLI:
             print("+--------------------------------+\n")
         elif sensor == "pH":
             print("\n+----- AVAILABLE PARAMETERS -----+")
-            print("| 1. max                         |")
-            print("| 2. min                         |")
+            print("| 1. min                         |")
+            print("| 2. max                         |")
             print("| 3. both                        |")
             print("| 4. delta                       |")
             print("| 5. all                         |")
@@ -156,8 +155,8 @@ class CLI:
             print("+--------------------------------+\n")
         elif sensor == "salinity":
             print("\n+----- AVAILABLE PARAMETERS -----+")
-            print("| 1. max                         |")
-            print("| 2. min                         |")
+            print("| 1. min                         |")
+            print("| 2. max                         |")
             print("| 3. both                        |")
             print("| 4. delta                       |")
             print("| 5. all                         |")
@@ -172,6 +171,13 @@ class CLI:
                 print("Temperature sensor has only two parameters: max and delta. Please enter a valid parameter.\n")
                 continue
             elif parameter in ["max", "min", "both", "delta", "all"]:
+
+                print(f"\nActual parameters for {sensor} sensor:")
+                if self.sensor_map[sensor].min is not None:
+                    print(f"Min Value: {self.sensor_map[sensor].min}")
+                print(f"Max Value: {self.sensor_map[sensor].max}")
+                print(f"Delta: {self.sensor_map[sensor].delta}\n")
+
                 await self.parametershandler(sensor, parameter)
                 break
             elif parameter == "exit":
@@ -192,9 +198,22 @@ class CLI:
                         print(f"Invalid input. The maximum value {maxvalue} must be greater than the actual minimum value {sensor.min}.")
                         continue
                     
-                    if sensor.type == "temperature" and maxvalue < 5:
-                        print(f"Invalid input. The maximum value {maxvalue} for temperature sensor must be greater than 5.")
+                    if sensor.type == "temperature" and maxvalue < 0:
+                        print(f"Invalid input. The maximum value {maxvalue} for temperature sensor must be greater than 0.")
                         continue
+                    
+                    if sensor.type == "ph" and maxvalue > 14:
+                        print(f"Invalid input. The maximum value {maxvalue} for pH sensor must be less than 14.")
+                        continue
+
+                    if sensor.type == "temperature" and maxvalue < sensor.delta:
+                        print(f"Invalid input. The maximum value {maxvalue} must be greater than the actual delta value {sensor.delta} for temperature sensor.")
+                        continue
+
+                    elif sensor.type != "temperature" and maxvalue<sensor.min+sensor.delta:
+                        print(f"Invalid input. The maximum value {maxvalue} must be greater than {sensor.min+sensor.delta}.")
+                        continue
+
 
                     sensor.max = maxvalue
                     self.publish_queue.put((f"params/{sensor.type}", {"max_value":maxvalue}))
@@ -207,8 +226,21 @@ class CLI:
                 try:
                     minvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MIN VALUE> ")
                     minvalue = round(float(minvalue), 2)
+
                     if sensor.max<minvalue:
                         print(f"Invalid input. The minimum value {minvalue} must be less than the actual maximum value {sensor.max}.")
+                        continue
+
+                    if sensor.type == "ph" and minvalue < 0:
+                        print(f"Invalid input. The minimum value {minvalue} for pH sensor must be greater than 0.")
+                        continue
+
+                    if sensor.type == "salinity" and minvalue < 0:
+                        print(f"Invalid input. The minimum value {minvalue} for salinity sensor must be greater than 0.")
+                        continue
+
+                    if minvalue > sensor.max-sensor.delta:
+                        print(f"Invalid input. The minimum value {minvalue} must be less than {sensor.max-sensor.delta}.")
                         continue
 
                     sensor.min = minvalue
@@ -220,24 +252,50 @@ class CLI:
 
             elif parameter == "both":
                 try:
+
+                    if sensor.type != "temperature":
+                        minvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MIN VALUE>: ")
+                        minvalue = round(float(minvalue), 2)
+
+                    if sensor.type == "ph" and minvalue < 0:
+                        print(f"Invalid input. The minimum value {minvalue} must be greater than 0 for pH sensor.")
+                        continue
+
+                    if sensor.type == "salinity" and minvalue < 0:
+                        print(f"Invalid input. The minimum value {minvalue} for salinity sensor must be greater than 0.")
+                        continue
+
                     maxvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MAX VALUE>: ")
                     maxvalue = round(float(maxvalue), 2)
+
+                    if sensor.type == "temperature" and maxvalue < 0:
+                        print(f"Invalid input. The maximum value {maxvalue} for temperature sensor must be greater than 0.")
+                        continue
+
+                    if sensor.type == "ph" and maxvalue > 14:
+                        print(f"Invalid input. The maximum value {maxvalue} must be less than 14 for pH sensor.")
+                        continue
 
                     if sensor.type == "temperature":
                         delta = await asyncio.get_event_loop().run_in_executor(None, input, "DELTA> ")
                         delta = round(float(delta), 2)
-                    else:    
-                        minvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MIN VALUE>: ")
-                        minvalue = round(float(minvalue), 2)
-
+                    
+                    if(sensor.type == "temperature" and delta < 0):
+                        print(f"Invalid input. The delta value {delta} must be greater than 0.")
+                        continue
+  
                     if(sensor.type == "temperature" and delta>maxvalue):
                         print(f"Invalid input. The delta value {delta} must be less or equal than the maximum value {maxvalue} for temperature sensor.")
                         continue
-
+                    
                     elif (sensor.type != "temperature" and minvalue > maxvalue):
                         print(f"Invalid input. The minimum value {minvalue} must be less or equal than the maximum value {maxvalue}.")
                         continue
 
+                    elif(sensor.type != "temperature" and sensor.delta>maxvalue-minvalue):
+                        print(f"Invalid input. The resulting delta value {maxvalue-minvalue} must be greater than actual delta value {sensor.delta}.")
+                        continue
+                        
                     sensor.max = maxvalue
 
                     if(sensor.type == "temperature"):
@@ -255,6 +313,10 @@ class CLI:
                 try:
                     delta = await asyncio.get_event_loop().run_in_executor(None, input, "DELTA> ")
                     delta = round(float(delta), 2)
+
+                    if(delta < 0):
+                        print(f"Invalid input. The delta value {delta} must be greater than 0.")
+                        continue
 
                     if(sensor.type == "temperature" and delta>sensor.max):
                         print(f"Invalid input. The delta value {delta} must be less or equal than the actual maximum value {sensor.max} for temperature sensor.")
@@ -274,18 +336,36 @@ class CLI:
                     
             elif parameter == "all":
                 try:
-                    maxvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MAX VALUE>: ")
-                    maxvalue = round(float(maxvalue), 2)
                     minvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MIN VALUE>: ")
                     minvalue = round(float(minvalue), 2)
-                    delta = await asyncio.get_event_loop().run_in_executor(None, input, "DELTA>: ")
-                    delta = round(float(delta), 2)
+
+                    if sensor.type == "ph" and minvalue < 0:
+                        print(f"Invalid input. The minimum value {minvalue} must be greater than 0 for pH sensor.")
+                        continue
+
+                    if sensor.type == "salinity" and minvalue < 0:
+                        print(f"Invalid input. The minimum value {minvalue} for salinity sensor must be greater than 0.")
+                        continue
+
+                    maxvalue = await asyncio.get_event_loop().run_in_executor(None, input, "MAX VALUE>: ")
+                    maxvalue = round(float(maxvalue), 2)
 
                     if minvalue > maxvalue:
                         print(f"Invalid input. The minimum value {minvalue} must be less than the maximum value {maxvalue}.")
                         continue
 
-                    if( delta>maxvalue-minvalue):
+                    if sensor.type == "ph" and maxvalue > 14:
+                        print(f"Invalid input. The maximum value {maxvalue} must be less than 14 for pH sensor.")
+                        continue
+
+                    delta = await asyncio.get_event_loop().run_in_executor(None, input, "DELTA>: ")
+                    delta = round(float(delta), 2)
+
+                    if(delta < 0):
+                        print(f"Invalid input. The delta value {delta} must be greater than 0.")
+                        continue
+
+                    if(delta>maxvalue-minvalue):
                         print(f"Invalid input. The delta value {delta} must be less than {maxvalue-minvalue}.")
                         continue
 
