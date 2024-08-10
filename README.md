@@ -4,7 +4,7 @@
 
 **LeatherSense** is an IoT-based monitoring and control system designed to optimize the pickling phase of the leather tanning process. The system monitors key environmental parameters such as pH, salinity, temperature, and hydrogen sulfide (H2S) levels to ensure high product quality, operational efficiency, and worker safety.
 
-Here an example of a system display while it is running:
+Here an example of a system display while it is running (using Grafana):
 ![grafana status](grafana/Status.png)
 ![grafana trends](grafana/Trends.png)
 

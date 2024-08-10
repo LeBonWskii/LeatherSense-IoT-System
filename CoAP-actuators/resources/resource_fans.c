@@ -103,12 +103,12 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
 		    coap_set_status_code(response, CHANGED_2_04);
 	    }
 
-        //  FANS_EXHAUST -> YELLOW led
+        //  FANS_EXHAUST -> RED led
         else if((strncmp(action, getFansStatus(FANS_EXHAUST), len) == 0)){
             if(fans_status != FANS_EXHAUST){
                 fans_status = FANS_EXHAUST;
                 leds_off(LEDS_BLUE);
-                leds_on(LEDS_GREEN);
+                leds_off(LEDS_GREEN);
                 leds_on(LEDS_RED);
                 LOG_INFO("Fans are in exhaust mode\n");
             }
@@ -133,13 +133,13 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
             coap_set_status_code(response, CHANGED_2_04);
         }
 
-        // FANS_BOTH -> RED led
+        // FANS_BOTH -> RED + BLUE leds (PURPLE)
         else if((strncmp(action, getFansStatus(FANS_BOTH), len) == 0)){
             if(fans_status != FANS_BOTH){
                 fans_status = FANS_BOTH;
                 leds_off(LEDS_GREEN);
                 leds_on(LEDS_RED);
-                leds_off(LEDS_BLUE);
+                leds_on(LEDS_BLUE);
                 LOG_INFO("Fans are in both exhaust and cooling modes\n");
             }
             else

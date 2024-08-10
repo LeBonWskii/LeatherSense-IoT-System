@@ -103,13 +103,13 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
 		    coap_set_status_code(response, CHANGED_2_04);
 	    }
 
-        //  PUMP_PURE -> YELLOW led
+        //  PUMP_PURE -> BLUE led
         else if((strncmp(action, getPumpStatus(PUMP_PURE), len) == 0)){
             if(pump_status != PUMP_PURE){
                 pump_status = PUMP_PURE;
-                leds_off(LEDS_BLUE);
-                leds_on(LEDS_GREEN);
-                leds_on(LEDS_RED);
+                leds_on(LEDS_BLUE);
+                leds_off(LEDS_GREEN);
+                leds_off(LEDS_RED);
                 LOG_INFO("Pump is in pure mode\n");
             }
             else
@@ -133,12 +133,12 @@ static void res_put_handler(coap_message_t *request, coap_message_t *response, u
             coap_set_status_code(response, CHANGED_2_04);
         }
 
-        // PUMP_BASE -> BLUE led
+        // PUMP_BASE -> BLUE + RED leds (PURPLE)
         else if((strncmp(action, getPumpStatus(PUMP_BASE), len) == 0)){
             if(pump_status != PUMP_BASE){
                 pump_status = PUMP_BASE;
                 leds_off(LEDS_GREEN);
-                leds_off(LEDS_RED);
+                leds_on(LEDS_RED);
                 leds_on(LEDS_BLUE);
                 LOG_INFO("Pump is in base mode\n");
             }
