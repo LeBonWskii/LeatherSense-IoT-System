@@ -86,6 +86,7 @@ PROCESS_THREAD(actuator_locker, ev, data){
     PROCESS_BEGIN();
 
 	// REGISTERING -> YELLOW LED
+	leds_off(LEDS_BLUE);
 	leds_on(LEDS_RED);
 	leds_on(LEDS_GREEN);
 
@@ -105,7 +106,7 @@ PROCESS_THREAD(actuator_locker, ev, data){
     
 		// Registration failed
         if(max_registration_retry == -1) {
-			etimer_set(&sleep_timer, 30 * CLOCK_SECOND);
+			etimer_set(&sleep_timer, 10 * CLOCK_SECOND);
 			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&sleep_timer));
 			max_registration_retry = MAX_REGISTRATION_RETRY;
 		}

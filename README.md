@@ -8,6 +8,8 @@ Here an example of a system display while it is running (using Grafana):
 ![grafana status](grafana/Status.png)
 ![grafana trends](grafana/Trends.png)
 
+More information about the project can be found in the [project report](documentation/Documentation.pdf).
+
 ## Features
 
 - **Real-time Monitoring**: Continuous tracking of critical water characteristics (pH, salinity, temperature) and toxic gas levels (H2S).
