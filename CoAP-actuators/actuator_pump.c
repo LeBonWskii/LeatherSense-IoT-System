@@ -85,9 +85,10 @@ PROCESS_THREAD(actuator_pump, ev, data){
 
     PROCESS_BEGIN();
 
-	// Turn on the red and blue LEDS solid while not registered
+	// REGISTERING -> YELLOW LED
+	leds_off(LEDS_BLUE);
 	leds_on(LEDS_RED);
-	leds_on(LEDS_BLUE);
+	leds_on(LEDS_GREEN);
 
 	/* -------------- Registration --------------- */
 
@@ -105,17 +106,15 @@ PROCESS_THREAD(actuator_pump, ev, data){
     
 		// Registration failed
         if(max_registration_retry == -1) {
-			etimer_set(&sleep_timer, 30 * CLOCK_SECOND);
+			etimer_set(&sleep_timer, 10 * CLOCK_SECOND);
 			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&sleep_timer));
 			max_registration_retry = MAX_REGISTRATION_RETRY;
 		}
 	}
 
-    // Turn on the green LED solid once registered
+    // REGISTERED -> GREEN LED
     if(max_registration_retry == 0) {
 		leds_off(LEDS_RED);
-		leds_off(LEDS_BLUE);
-        leds_on(LEDS_GREEN);
     }    
 	
 	/* ----------- Resource activation ----------- */

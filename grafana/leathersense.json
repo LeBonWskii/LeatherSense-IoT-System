@@ -121,7 +121,7 @@
                   {
                     "options": {
                       "not found yet": {
-                        "color": "purple",
+                        "color": "black",
                         "index": 2,
                         "text": "Not found"
                       },
@@ -154,7 +154,7 @@
                   {
                     "options": {
                       "both": {
-                        "color": "red",
+                        "color": "purple",
                         "index": 4,
                         "text": "Both"
                       },
@@ -164,12 +164,12 @@
                         "text": "Cooling"
                       },
                       "exhaust": {
-                        "color": "yellow",
+                        "color": "red",
                         "index": 2,
                         "text": "Exhaust"
                       },
                       "not found yet": {
-                        "color": "purple",
+                        "color": "black",
                         "index": 0,
                         "text": "Not found"
                       },
@@ -197,7 +197,7 @@
                   {
                     "options": {
                       "Not found yet": {
-                        "color": "purple",
+                        "color": "black",
                         "index": 0,
                         "text": "Not found"
                       },
@@ -207,7 +207,7 @@
                         "text": "Acid"
                       },
                       "base": {
-                        "color": "blue",
+                        "color": "purple",
                         "index": 2,
                         "text": "Base"
                       },
@@ -217,7 +217,7 @@
                         "text": "Off"
                       },
                       "pure": {
-                        "color": "yellow",
+                        "color": "blue",
                         "index": 3,
                         "text": "Pure"
                       }
@@ -240,7 +240,7 @@
                   {
                     "options": {
                       "Not found yet": {
-                        "color": "purple",
+                        "color": "black",
                         "index": 0,
                         "text": "Not found"
                       },
