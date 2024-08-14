@@ -1,4 +1,4 @@
-rpl-border-router/build/* linguist-vendored
+rpl-border-router/build/** linguist-vendored
 CoAP-RegistrationServer/private/credential.json linguist-vendored
-CoAP-actuators/build/* linguist-vendored
-MQTT-Sensors/build/* linguist-vendored
+CoAP-actuators/build/** linguist-vendored
+MQTT-Sensors/build/** linguist-vendored
