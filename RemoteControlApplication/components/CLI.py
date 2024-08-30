@@ -59,10 +59,10 @@ class CLI:
                 await self.handleCommand(command.lower())
         except KeyboardInterrupt:
             print("\nExiting...")
-            self.stop_event.set()
-            self.publisher_thread.join()
             if self.pickling_starting_time is not None:
                 await self.stop_pickling()
+            self.stop_event.set()
+            self.publisher_thread.join()
             sys.exit(0)
     
     async def handleCommand(self, command):
