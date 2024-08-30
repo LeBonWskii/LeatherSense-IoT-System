@@ -1,7 +1,7 @@
 import sys
 from coapthon.server.coap import CoAP
 from mysql.connector import Error
-from resources.registration import Registration
+from resources.Registration import Registration
 from database.models.database import Database
 
 class CoAPServer(CoAP):
