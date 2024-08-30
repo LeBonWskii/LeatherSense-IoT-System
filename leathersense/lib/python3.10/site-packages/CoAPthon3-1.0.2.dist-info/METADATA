@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: CoAPthon3
+Version: 1.0.2
+Summary: CoAPthon is a python library to the CoAP protocol.
+Home-page: https://github.com/mcfreis/CoAPthon3
+Author: Giacomo Tanganelli
+Author-email: giacomo.tanganelli@for.unipi.it
+Maintainer: Bjoern Freise
+Maintainer-email: mcfreis@gmx.net
+License: MIT License
+Platform: UNKNOWN
+Requires: sphinx
+Requires: cachetools
+
+UNKNOWN
+
+
