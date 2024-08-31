@@ -169,6 +169,7 @@ static int current_topic_index = 0; // Index of the current topic being subscrib
 static int count_sensor_interval = 0;//counter to check the number of times the sensor is activated
 static bool warning_status_active = false; //flag to check if the warning is active
 static bool start = false; //flag to check if the pickling process is started. 
+static bool first_publication = true; //flag to check if it is the first publication
 
 static char payload[BUFFER_SIZE];
 static char temp_str[BUFFER_SIZE]; 
@@ -239,7 +240,9 @@ void replace_comma_with_dot(char *str) {
 static void sensor_callback(void *ptr){
     if(state != STATE_START) 
         return;
-
+    leds_off(LEDS_BLUE);
+    leds_off(LEDS_RED);
+    leds_on(LEDS_GREEN);       
     // Generate random values for temperature, pH and salinity
     current_temp = generate_random_temp();
     current_ph = generate_random_ph();
@@ -279,7 +282,6 @@ static void sensor_callback(void *ptr){
           
     }
     
-
 
 
     if(warning_status_active){
@@ -420,8 +422,41 @@ static void sensor_callback(void *ptr){
               ctimer_set(&tps_sensor_timer, MONITORING_INTERVAL, sensor_callback, NULL);
         }
         else{
+            if(first_publication){
+                sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
+
+                cJSON *root = cJSON_CreateObject();
+                if (!root) {
+                    printf("Error creating cJSON object.\n");
+                    return;  
+                }
+
+                // Add temperature, pH, and salinity values as strings to cJSON object
+                cJSON_AddStringToObject(root, "temperature", temp_str);
+                cJSON_AddStringToObject(root, "pH", ph_str);
+                cJSON_AddStringToObject(root, "salinity", salinity_str);
+
+                char *json_string = cJSON_PrintUnformatted(root); 
+                if (!json_string) {
+                    cJSON_Delete(root);
+                    printf("Error converting cJSON object to JSON string.\n");
+                    return;  
+                }
+              
+                sprintf(app_buffer, "%s", json_string);
+                
+                // Cleanup cJSON resources
+                cJSON_Delete(root);
+                free(json_string);
+
+                // Publish JSON string
+                mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
+                LOG_INFO("Publishing values on %s topic. Publishing reason: first values sensed after the start command\n", pub_topic);
+                first_publication = false;
+                ctimer_reset(&tps_sensor_timer);
+            }
           /*else all is ok publish only after 4 times (40 seconds in normal status)*/
-            if(count_sensor_interval == 3){
+            else if(count_sensor_interval == 3){
                 sprintf(pub_topic, "%s", "sensor/temp_pH_sal"); // publish on the topic sensor/temp_pH_sal
 
                 cJSON *root = cJSON_CreateObject();
@@ -684,6 +719,9 @@ static void mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data
   }
   case MQTT_EVENT_PUBACK: {
     LOG_INFO("Publishing complete.\n");
+    leds_on(LEDS_BLUE);
+    leds_off(LEDS_RED);
+    leds_off(LEDS_GREEN);    
     break;
   }
   default:
@@ -705,6 +743,11 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
 {
   PROCESS_BEGIN();
   
+
+  leds_off(LEDS_BLUE);
+  leds_on(LEDS_RED);
+  leds_on(LEDS_GREEN);  
+
   LOG_INFO("MQTT-Sensor-temp_ph_salinity started\n");
 
   // Initialize the ClientID as MAC address
@@ -735,6 +778,9 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
       if (state == STATE_NET_OK) {
         // Connect to MQTT server
         LOG_INFO("Connecting!\n");
+        leds_off(LEDS_BLUE);
+        leds_on(LEDS_RED);
+        leds_on(LEDS_GREEN);
         memcpy(broker_address, broker_ip, strlen(broker_ip));
         mqtt_connect(&conn, broker_address, DEFAULT_BROKER_PORT, (DEFAULT_PUBLISH_INTERVAL * 3) / CLOCK_SECOND, MQTT_CLEAN_SESSION_ON);
         state = STATE_CONNECTING;
@@ -794,6 +840,9 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
         if(!start){
             state = STATE_WAITSTART;
             LOG_INFO("Waiting for start command for temp_ph_sal sensor\n");
+            leds_off(LEDS_BLUE);
+	        leds_on(LEDS_RED);
+	        leds_off(LEDS_GREEN);
         }
         else{
             state = STATE_START;
@@ -809,6 +858,10 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
             ctimer_set(&tps_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
             first_time = false;
             start=true;
+            first_publication = true;
+            leds_off(LEDS_BLUE);
+            leds_off(LEDS_RED);
+            leds_on(LEDS_GREEN);
             LOG_INFO("Sensor temp_ph_sal started successfully\n");
         }
         
@@ -823,6 +876,9 @@ PROCESS_THREAD(sensor_temp_ph_sal, ev, data)
         salinity_out_of_bounds_max = false;
         warning_status_active = false;
         count_sensor_interval = 0;
+        leds_off(LEDS_BLUE);
+	    leds_on(LEDS_RED);
+	    leds_off(LEDS_GREEN);
         state = STATE_WAITSTART;
         start = false;
          LOG_INFO("Sensor temp_ph_sal stopped successfully\n");

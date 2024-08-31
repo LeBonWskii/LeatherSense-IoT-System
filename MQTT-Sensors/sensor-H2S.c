@@ -131,6 +131,7 @@ static bool warning_status_active = false; //flag to check if the warning status
 static int count_sensor_interval = 0; //counter for the number of times the sensor interval has been reached
 static struct etimer reconnection_timer; //timer for reconnection to the broker
 static bool start = false; //flag to check if the sensor has started
+static bool first_publication = true; //flag to check if it is the first publication
 
 #define SENSOR_INTERVAL (CLOCK_SECOND * 8) //interval for sensing values of H2S
 #define MONITORING_INTERVAL (CLOCK_SECOND * 4) //interval for monitoring the is warning status
@@ -144,6 +145,9 @@ static int generate_h2s(){
 /*---------------------------------------------------------------------------*/
 static void sensor_callback(void *ptr){
     // Generate random values for H2S
+    leds_off(LEDS_BLUE);
+    leds_off(LEDS_RED);
+    leds_on(LEDS_GREEN);       
     current_h2s = generate_h2s();
     if(current_h2s)
         LOG_INFO("*WARNING* H2S DETECTED\n");
@@ -170,7 +174,7 @@ static void sensor_callback(void *ptr){
             ctimer_reset(&h2s_sensor_timer);
         }
         else{
-            count_sensor_interval++;
+            count_sensor_interval++;     
             ctimer_reset(&h2s_sensor_timer);
         }   
     }
@@ -186,17 +190,26 @@ static void sensor_callback(void *ptr){
             ctimer_set(&h2s_sensor_timer, MONITORING_INTERVAL, sensor_callback, NULL);
         }
         else{
+            if(first_publication){
+                sprintf(pub_topic, "%s", "sensor/h2s"); //publish on the topic sensor/h2s
+                sprintf(app_buffer, "{ \"h2s\": %d }", current_h2s);
+                mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
+                LOG_INFO("Publishing values on %s topic. Publishing reason: first value sensed after the start command\n", pub_topic);
+                first_publication = false;            
+                ctimer_reset(&h2s_sensor_timer);
+            }
+
           /*else all is ok publish only after 4 times (32 seconds in normal status)*/
-            if(count_sensor_interval == 3){
+            else if(count_sensor_interval == 3){
                 sprintf(pub_topic, "%s", "sensor/h2s"); //publish on the topic sensor/h2s
                 sprintf(app_buffer, "{ \"h2s\": %d }", current_h2s);
                 mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer, strlen(app_buffer), MQTT_QOS_LEVEL_1, MQTT_RETAIN_OFF);
                 LOG_INFO("Publishing values on %s topic. Publishing reason: too much time spent without publishing in normal status\n", pub_topic);
                 count_sensor_interval = 0;
-                ctimer_reset(&h2s_sensor_timer);
+                ctimer_reset(&h2s_sensor_timer);  
             }
             else{
-                count_sensor_interval++;
+                count_sensor_interval++;               
                 ctimer_reset(&h2s_sensor_timer);
             }
         }
@@ -275,6 +288,9 @@ static void mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data
   }
   case MQTT_EVENT_PUBACK: {
     LOG_INFO("Publishing complete.\n");
+    leds_on(LEDS_BLUE);
+    leds_off(LEDS_RED);
+    leds_off(LEDS_GREEN);    
     break;
   }
   default:
@@ -295,8 +311,13 @@ static bool have_connectivity(void){
 PROCESS_THREAD(sensor_h2s, ev, data)
 {
   PROCESS_BEGIN();
-  
+
+  leds_off(LEDS_BLUE);
+	leds_on(LEDS_RED);
+	leds_on(LEDS_GREEN);
+
   LOG_INFO("MQTT-Sensor-H2S started\n");
+
 
   // Initialize the ClientID as MAC address
   snprintf(client_id, BUFFER_SIZE, "%02x%02x%02x%02x%02x%02x",
@@ -325,6 +346,9 @@ PROCESS_THREAD(sensor_h2s, ev, data)
       if (state == STATE_NET_OK) {
         // Connect to MQTT server
         LOG_INFO("Connecting!\n");
+        leds_off(LEDS_BLUE);
+        leds_on(LEDS_RED);
+        leds_on(LEDS_GREEN);
         memcpy(broker_address, broker_ip, strlen(broker_ip));
         mqtt_connect(&conn, broker_address, DEFAULT_BROKER_PORT, (DEFAULT_PUBLISH_INTERVAL * 3) / CLOCK_SECOND, MQTT_CLEAN_SESSION_ON);
         state = STATE_CONNECTING;
@@ -342,6 +366,9 @@ PROCESS_THREAD(sensor_h2s, ev, data)
         if(!start){
           state=STATE_WAITSTART;
           LOG_INFO("Waiting for start command for H2S sensor\n");
+          leds_off(LEDS_BLUE);
+	        leds_on(LEDS_RED);
+	        leds_off(LEDS_GREEN);
         }
         else{
           state=STATE_START;
@@ -353,7 +380,11 @@ PROCESS_THREAD(sensor_h2s, ev, data)
         if(first_time){
             ctimer_set(&h2s_sensor_timer, SENSOR_INTERVAL, sensor_callback, NULL);
             first_time = false;
+            first_publication = true;
             start = true;
+            leds_off(LEDS_BLUE);
+            leds_off(LEDS_RED);
+            leds_on(LEDS_GREEN);
             LOG_INFO("Sensor H2S started successfully \n");
         }
       }
@@ -363,6 +394,9 @@ PROCESS_THREAD(sensor_h2s, ev, data)
         first_time = true;
         warning_status_active = false;
         count_sensor_interval = 0;
+        leds_off(LEDS_BLUE);
+	      leds_on(LEDS_RED);
+	      leds_off(LEDS_GREEN);
         state = STATE_WAITSTART;
         LOG_INFO("Sensor H2S stopped successfully\n");
       }
