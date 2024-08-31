@@ -1,4 +1,4 @@
 paho-mqtt
 aiocoap
 mysql-connector-python
-coapthon
+coapthon3

@@ -75,6 +75,10 @@ The system is based on the **Contiki-NG** operating system, with sensors and act
      - This will create a `Makefile.target` file in the directory, making subsequent commands simpler.
 
 4. **Run the System**:
+   - Add the execution permissions to the `run.sh` script:
+   ```bash
+   chmod +x run.sh
+   ```
    - Use the provided `run.sh` script to automate the setup and launch of the system:
    ```bash
    ./run.sh [cooja|dongle|help]
