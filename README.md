@@ -92,11 +92,11 @@ The system is based on the **Contiki-NG** operating system, with sensors and act
 In the CLI interface:
 - **Start the Pickling Process**:
    ```bash
-   start_pickling
+   start pickling
    ```
 - **Stop the Pickling Process**:
    ```bash
-   stop_pickling
+   stop pickling
    ```
 - **Monitor System Status**:
    ```bash
