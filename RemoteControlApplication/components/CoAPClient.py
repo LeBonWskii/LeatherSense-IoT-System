@@ -31,4 +31,4 @@ class CoAPClient:
                 await self.resource_dao.update_status("Error")
         
         except Exception as e:
-            print(f"\nFailed to fetch resource: {e}", file=sys.stderr)
+            await self.resource_dao.update_status("Error")

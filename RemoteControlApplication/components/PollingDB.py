@@ -1,7 +1,7 @@
 import sys
 import asyncio
 import mysql.connector
-from datetime import datetime
+from datetime import datetime, timedelta
 from DAO.ResourceDAO import ResourceDAO
 from .CoAPClient import CoAPClient
 from .models import PHSensor, SalinitySensor, H2SSensor, TempSensor
@@ -16,6 +16,7 @@ class PollingDB:
         self.types = types
         self.running = False
         self.stopping = False
+        self.last_forced_communication = None 
 
     async def start(self):
         '''
@@ -26,8 +27,13 @@ class PollingDB:
         await self.initialize_actuators()
         self.running = True
         self.stopping = False
+        self.last_forced_communication = datetime.utcnow()
         while self.running:
             await self.polling()
+            # Force communication every 2 minutes
+            if datetime.utcnow() - self.last_forced_communication > timedelta(minutes=1):
+                await self.force_communication()
+                self.last_forced_communication = datetime.utcnow()
             await asyncio.sleep(1)
     
     def initiate_id(self):
@@ -73,15 +79,36 @@ class PollingDB:
             "locker": await ResourceDAO.retrieve_information("locker")
         }
         # Initialize actuators if they are connected
-        if resource_status["fans"] is not None:
+        if resource_status["fans"] is not None and resource_status["fans"] != "Error":
             await CoAPClient(resource_status["fans"], "off").run()
-        if resource_status["pump"] is not None:
+        if resource_status["pump"] is not None and resource_status["pump"] != "Error":
             await CoAPClient(resource_status["pump"], "off").run()
-        if resource_status["alarm"] is not None:
+        if resource_status["alarm"] is not None and resource_status["alarm"] != "Error":
             await CoAPClient(resource_status["alarm"], "off").run()
-        if resource_status["locker"] is not None:
+        if resource_status["locker"] is not None and resource_status["locker"] != "Error":
             await CoAPClient(resource_status["locker"], "off").run()
-        
+    
+    async def force_communication(self):
+        '''
+        Force communication with the actuators to ensure they are still working
+        '''
+        # Retrieve resource status
+        resource_status = {
+            "fans": await ResourceDAO.retrieve_information("fans"),
+            "pump": await ResourceDAO.retrieve_information("pump"),
+            "alarm": await ResourceDAO.retrieve_information("alarm"),
+            "locker": await ResourceDAO.retrieve_information("locker")
+        }
+        # Force communication with the actuators
+        if resource_status["fans"] is not None and resource_status["fans"] != "Error":
+            await CoAPClient(resource_status["fans"], resource_status["fans"].status).run()
+        if resource_status["pump"] is not None and resource_status["pump"] != "Error":
+            await CoAPClient(resource_status["pump"], resource_status["pump"].status).run()
+        if resource_status["alarm"] is not None and resource_status["alarm"] != "Error":
+            await CoAPClient(resource_status["alarm"], resource_status["alarm"].status).run()
+        if resource_status["locker"] is not None and resource_status["locker"] != "Error":
+            await CoAPClient(resource_status["locker"], resource_status["locker"].status).run()
+
     async def stop(self):
         '''
         Stop the polling of the database and turn off all actuators
@@ -97,19 +124,19 @@ class PollingDB:
         }
         
         # Turn off pump and alarm
-        if resource_status["pump"] is not None and resource_status["pump"].status != "off":
+        if resource_status["pump"] is not None and resource_status["pump"] != "Error" and resource_status["pump"].status != "off":
             await CoAPClient(resource_status["pump"], "off").run()
             print("Water pump turned off.")
-        if resource_status["alarm"] is not None and resource_status["alarm"].status != "off":
+        if resource_status["alarm"] is not None and resource_status["alarm"] != "Error" and resource_status["alarm"].status != "off":
             await CoAPClient(resource_status["alarm"], "off").run()
             print("Alarm turned off.")
 
         # Turn off the locker if it is connected only if H2S is no more detected, otherwise keep it on
-        if resource_status["locker"] is not None:
+        if resource_status["locker"] is not None and resource_status["locker"] != "Error":
             if self.types["H2S"].value is not None and int(self.types["H2S"].value) == 1:
                 print("H2S still detected, waiting for it to be no more detected before turning off locker...")
                 # Mantaining air fans active to drain the gas                
-                if resource_status["fans"] is not None:
+                if resource_status["fans"] is not None and resource_status["fans"] != "Error":
                     print("Draining H2S using air fans...")
                     if resource_status["fans"].status != "exhaust":
                         await CoAPClient(resource_status["fans"], "exhaust").run()
@@ -119,11 +146,11 @@ class PollingDB:
                 print("H2S no more detected, turning off locker!")
             await CoAPClient(resource_status["locker"], "off").run()
             print("Locker turned off.")
-            if resource_status["fans"] is not None:
+            if resource_status["fans"] is not None and resource_status["fans"] != "Error":
                 await CoAPClient(resource_status["fans"], "off").run()
                 print("Air fans turned off.")
         else:
-            if resource_status["fans"] is not None and resource_status["fans"].status != "off":
+            if resource_status["fans"] is not None and resource_status["fans"] != "Error" and resource_status["fans"].status != "off":
                 await CoAPClient(resource_status["fans"], "off").run()
                 print("Air fans turned off.")
 
@@ -145,7 +172,7 @@ class PollingDB:
             new_id = self.last_id
             cursor = self.connection.cursor()
             query = '''
-                SELECT t.type, t.value, t.id
+                SELECT t.type, t.value, t.id, t.timestamp
                 FROM telemetry t
                 JOIN (
                     SELECT type, MAX(id) AS max_id
@@ -162,7 +189,14 @@ class PollingDB:
             self.connection.commit()
             for row in result:
                 self.types[row[0]].value = row[1]
+                self.types[row[0]].timestamp = row[3]
                 new_id = max(new_id, row[2])
+            
+            # If timestamp is older than 1 minute, set value to None
+            for actuator in self.types:
+                if self.types[actuator].timestamp is not None and datetime.utcnow() - self.types[actuator].timestamp > timedelta(minutes=1):
+                    self.types[actuator].value = None
+
         except mysql.connector.Error as e:
             print(f"Error: {e}")
         
@@ -183,7 +217,7 @@ class PollingDB:
             "locker": await ResourceDAO.retrieve_information("locker")
         }
         # Manage locker if it is connected
-        if resource_status["locker"] is not None:
+        if resource_status["locker"] is not None and resource_status["locker"] != "Error":
             await self.manage_locker(resource_status["locker"])
     
     async def check_values(self):
@@ -198,13 +232,13 @@ class PollingDB:
             "locker": await ResourceDAO.retrieve_information("locker")
         }
         # Manage resources if they are connected
-        if resource_status["fans"] is not None:
+        if resource_status["fans"] is not None and resource_status["fans"] != "Error":
             await self.manage_fans(resource_status["fans"])
-        if resource_status["pump"] is not None:
+        if resource_status["pump"] is not None and resource_status["pump"] != "Error":
             await self.manage_pump(resource_status["pump"])
-        if resource_status["alarm"] is not None:
+        if resource_status["alarm"] is not None and resource_status["alarm"] != "Error":
             await self.manage_alarm(resource_status["alarm"])
-        if resource_status["locker"] is not None:
+        if resource_status["locker"] is not None and resource_status["locker"] != "Error":
             await self.manage_locker(resource_status["locker"])
     
     async def manage_fans(self, resource):

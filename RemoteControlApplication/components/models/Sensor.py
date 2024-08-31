@@ -4,12 +4,13 @@ sys.path.append("../..")
 from database.models.database import Database
 
 class Sensor(ABC):
-    def __init__(self, type, min_value=None, max_value=None, delta=None, value=None):
+    def __init__(self, type, min_value=None, max_value=None, delta=None, value=None, timestamp=None):
         self._type = type
         self._min = min_value
         self._max = max_value
         self._delta = delta
         self._value = value
+        self._timestamp = timestamp
         if self._type is None:
             ret
         try:
@@ -104,3 +105,11 @@ class Sensor(ABC):
     @value.setter
     def value(self, value):
         self._value = value
+    
+    @property
+    def timestamp(self):
+        return self._timestamp
+    
+    @timestamp.setter
+    def timestamp(self, timestamp):
+        self._timestamp = timestamp

@@ -6,7 +6,16 @@ class H2SSensor():
     def __init__(self):
         self._type = "H2S"
         self._value = False
+        self._timestamp = None
     
+    @property
+    def timestamp(self):
+        return self._timestamp
+    
+    @timestamp.setter
+    def timestamp(self, timestamp):
+        self._timestamp = timestamp
+
     @property
     def value(self):
         return self._value

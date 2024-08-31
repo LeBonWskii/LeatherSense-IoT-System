@@ -38,9 +38,9 @@ else
 fi
 
 # List of scripts to run
-gnome-terminal --geometry=50x10+0+0 -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && python /$VENV_DIR/CoAP-RegistrationServer/main.py; exec bash"
-gnome-terminal --geometry=50x10+0+0 -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && python /$VENV_DIR/MQTT-Client/main.py; exec bash"
-gnome-terminal --geometry=100x40+0+0 -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && python /$VENV_DIR/RemoteControlApplication/main.py; exec bash"
+gnome-terminal --geometry=50x10+0+0 --title="CoAP Registration Server" -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && python /$VENV_DIR/CoAP-RegistrationServer/main.py; exec bash"
+gnome-terminal --geometry=50x10+0+0 --title="MQTT Client" -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && python /$VENV_DIR/MQTT-Client/main.py; exec bash"
+gnome-terminal --geometry=100x40+0+0 --title="Remote Control Application" -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && python /$VENV_DIR/RemoteControlApplication/main.py; exec bash"
 
 echo "All scripts started."
 
@@ -53,10 +53,10 @@ if [ "$1" == "cooja" ]; then
     read -p "Press any key to activate the border router..."
 
     # Activate border router
-    gnome-terminal -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && cd /$VENV_DIR/rpl-border-router && make TARGET=cooja connect-router-cooja; exec bash"
+    gnome-terminal --geometry=50x10+0+0 --title="Border Router" -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && cd /$VENV_DIR/rpl-border-router && make TARGET=cooja connect-router-cooja; exec bash"
 elif [ "$1" == "dongle" ]; then
     # Starts the dongle
-    gnome-terminal -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && cd /$VENV_DIR/rpl-border-router && make PORT=/dev/ttyACM0 connect-router; exec bash"
+    gnome-terminal --geometry=50x10+0+0 --title="Border Router" -- bash -c "source /$VENV_DIR/$VENV_NAME/bin/activate && cd /$VENV_DIR/rpl-border-router && make PORT=/dev/ttyACM0 connect-router; exec bash"
 else
     echo "Invalid argument."
     echo "Usage: ./run.sh [cooja|dongle|help]"

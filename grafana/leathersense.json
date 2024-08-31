@@ -120,19 +120,24 @@
                 "value": [
                   {
                     "options": {
-                      "not found yet": {
-                        "color": "black",
-                        "index": 2,
+                      "Error": {
+                        "color": "yellow",
+                        "index": 1,
+                        "text": "Not found"
+                      },
+                      "Not found yet": {
+                        "color": "yellow",
+                        "index": 0,
                         "text": "Not found"
                       },
                       "off": {
                         "color": "green",
-                        "index": 1,
+                        "index": 2,
                         "text": "Off"
                       },
                       "on": {
                         "color": "red",
-                        "index": 0,
+                        "index": 3,
                         "text": "On"
                       }
                     },
@@ -153,29 +158,34 @@
                 "value": [
                   {
                     "options": {
+                      "Error": {
+                        "color": "yellow",
+                        "index": 1,
+                        "text": "Not found"
+                      },
+                      "Not found yet": {
+                        "color": "yellow",
+                        "index": 0,
+                        "text": "Not found"
+                      },
                       "both": {
                         "color": "purple",
-                        "index": 4,
+                        "index": 5,
                         "text": "Both"
                       },
                       "cooling": {
                         "color": "blue",
-                        "index": 3,
+                        "index": 4,
                         "text": "Cooling"
                       },
                       "exhaust": {
                         "color": "red",
-                        "index": 2,
+                        "index": 3,
                         "text": "Exhaust"
-                      },
-                      "not found yet": {
-                        "color": "black",
-                        "index": 0,
-                        "text": "Not found"
                       },
                       "off": {
                         "color": "green",
-                        "index": 1,
+                        "index": 2,
                         "text": "Off"
                       }
                     },
@@ -196,29 +206,34 @@
                 "value": [
                   {
                     "options": {
+                      "Error": {
+                        "color": "yellow",
+                        "index": 1,
+                        "text": "Not found"
+                      },
                       "Not found yet": {
-                        "color": "black",
+                        "color": "yellow",
                         "index": 0,
                         "text": "Not found"
                       },
                       "acid": {
                         "color": "red",
-                        "index": 4,
+                        "index": 3,
                         "text": "Acid"
                       },
                       "base": {
                         "color": "purple",
-                        "index": 2,
+                        "index": 5,
                         "text": "Base"
                       },
                       "off": {
                         "color": "green",
-                        "index": 1,
+                        "index": 2,
                         "text": "Off"
                       },
                       "pure": {
                         "color": "blue",
-                        "index": 3,
+                        "index": 4,
                         "text": "Pure"
                       }
                     },
@@ -239,8 +254,13 @@
                 "value": [
                   {
                     "options": {
+                      "Error": {
+                        "color": "yellow",
+                        "index": 1,
+                        "text": "Not found"
+                      },
                       "Not found yet": {
-                        "color": "black",
+                        "color": "yellow",
                         "index": 0,
                         "text": "Not found"
                       },
@@ -251,7 +271,7 @@
                       },
                       "on": {
                         "color": "red",
-                        "index": 1,
+                        "index": 3,
                         "text": "On"
                       }
                     },
@@ -298,7 +318,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH TypesList AS (\n    SELECT \"actuator_locker\" AS type\n    UNION ALL\n    SELECT \"actuator_fans\" AS type\n    UNION ALL\n    SELECT \"actuator_pump\" AS type\n    UNION ALL\n    SELECT \"actuator_alarm\" AS type\n)\nSELECT \n    REPLACE(tl.type, \"actuator_\", \"\") AS \"Name\", \n    COALESCE(a.status, \"Not found yet\") AS \"Value\"\nFROM \n    TypesList tl\nLEFT JOIN \n    leathersense.actuator a ON tl.type = a.type\nLIMIT 50;\n",
+          "rawSql": "WITH TypesList AS (\n    SELECT \"actuator_locker\" AS type\n    UNION ALL\n    SELECT \"actuator_fans\" AS type\n    UNION ALL\n    SELECT \"actuator_pump\" AS type\n    UNION ALL\n    SELECT \"actuator_alarm\" AS type\n)\nSELECT \n    REPLACE(tl.type, \"actuator_\", \"\") AS \"Name\", \n    COALESCE(a.status, \"Not found yet\") AS \"Value\"\nFROM \n    TypesList tl\nLEFT JOIN \n    leathersense.actuator a \n    ON tl.type = a.type \nLIMIT 50;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -484,7 +504,7 @@
           "format": "table",
           "hide": false,
           "rawQuery": true,
-          "rawSql": "WITH WaterCharacteristics AS (\n    SELECT 'pH' AS type\n    UNION ALL\n    SELECT 'Salinity' AS type\n    UNION ALL\n    SELECT 'Temperature' AS type\n),\nRecentTelemetry AS (\n    SELECT \n        t.type,\n        t.value,\n        t.timestamp,\n        ROW_NUMBER() OVER (PARTITION BY t.type ORDER BY t.timestamp DESC) AS rn\n    FROM\n        telemetry t\n    WHERE\n        t.timestamp >= NOW() - INTERVAL 12 HOUR\n)\nSELECT \n    COALESCE(rt.type, wc.type) as Name,\n    rt.value AS Value,\n    0 AS Min,\n    COALESCE(p.min, 0) AS T1,\n    p.max as T2\nFROM\n    WaterCharacteristics wc\nLEFT JOIN \n    parameter p ON wc.type = p.type\nLEFT JOIN\n    (SELECT \n        type, value \n     FROM \n        RecentTelemetry \n     WHERE \n        rn = 1) rt \nON wc.type = rt.type;\n",
+          "rawSql": "WITH WaterCharacteristics AS (\n    SELECT 'pH' AS type\n    UNION ALL\n    SELECT 'Salinity' AS type\n    UNION ALL\n    SELECT 'Temperature' AS type\n),\nRecentTelemetry AS (\n    SELECT \n        t.type,\n        t.value,\n        t.timestamp,\n        ROW_NUMBER() OVER (PARTITION BY t.type ORDER BY t.timestamp DESC) AS rn\n    FROM\n        telemetry t\n    WHERE\n        t.timestamp >= NOW() - INTERVAL 2 HOUR - INTERVAL 1 MINUTE\n)\nSELECT \n    COALESCE(rt.type, wc.type) as Name,\n    rt.value AS Value,\n    0 AS Min,\n    COALESCE(p.min, 0) AS T1,\n    p.max as T2\nFROM\n    WaterCharacteristics wc\nLEFT JOIN \n    parameter p ON wc.type = p.type\nLEFT JOIN\n    (SELECT \n        type, value \n     FROM \n        RecentTelemetry \n     WHERE \n        rn = 1) rt \nON wc.type = rt.type;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -618,7 +638,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select type, value\nfrom leathersense.telemetry\nwhere type = \"H2S\" and timestamp >= NOW() - INTERVAL 12 hour\norder by id desc\nlimit 1;",
+          "rawSql": "select type, value\nfrom leathersense.telemetry\nwhere type = \"H2S\" and timestamp >= NOW() - INTERVAL 2 HOUR - INTERVAL 1 MINUTE\norder by id desc\nlimit 1;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1356,6 +1376,6 @@
   "timezone": "",
   "title": "LeatherSense",
   "uid": "fdrqrvq3265mod",
-  "version": 17,
+  "version": 19,
   "weekStart": ""
 }
