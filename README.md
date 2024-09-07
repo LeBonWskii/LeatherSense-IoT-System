@@ -38,15 +38,15 @@ The system is based on the **Contiki-NG** operating system, with sensors and act
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/LeBonWskii/IOT-Project.git
-   cd IOT-Project
+   git clone https://github.com/LeBonWskii/LeatherSense-IoT-System.git
+   cd LeatherSense-IoT-System
    ```
 
 2. **Move Repository to Contiki-NG Examples**:
    - Since the project relies on Contiki-NG dependencies, it should be placed within the `contiki-ng/examples` directory:
    ```bash
    mv IOT-Project /path/to/contiki-ng/examples/
-   cd /path/to/contiki-ng/examples/IOT-Project
+   cd /path/to/contiki-ng/examples/LeatherSense-IoT-System
    ```
 
 3. **Compile and Flash Code to nRF52840 Dongles**:
